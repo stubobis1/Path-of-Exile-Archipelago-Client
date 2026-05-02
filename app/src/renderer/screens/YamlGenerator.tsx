@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import poeOptionsJson from '../../data/poe_options.json'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -8,7 +8,7 @@ interface NamedValue   { value: number; name: string; display_name: string }
 interface BossGroups   { Guardian?: string[]; Pinnacle?: string[]; Uber?: string[] }
 
 type OptionType = 'choice' | 'toggle' | 'range' | 'option_set' | 'unknown'
-type OptionValue = number | string | string[]
+type OptionValue = number | string | string[] | Record<string, number>
 
 interface OptionDef {
   name: string
@@ -37,6 +37,8 @@ interface OptionsData {
 
 const BUNDLED_DATA = poeOptionsJson as unknown as OptionsData
 const DICT_UNKNOWNS = new Set(['start_inventory', 'start_inventory_from_pool', 'start_inventory_pool'])
+const INVENTORY_OPTS  = new Set(['start_inventory'])
+const COMBO_ITEM_OPTS = new Set(['local_items', 'non_local_items', 'start_hints'])
 const CAT_ORDER: (keyof BossGroups)[] = ['Guardian', 'Pinnacle', 'Uber']
 
 function defaultFor(opt: OptionDef): OptionValue {
@@ -47,6 +49,7 @@ function defaultFor(opt: OptionDef): OptionValue {
     const d = opt.default
     return d === 'random' ? 'random' : (d as number | undefined) ?? (opt.choices?.[0]?.value ?? 0)
   }
+  if (INVENTORY_OPTS.has(opt.name)) return {}
   return ''
 }
 
@@ -144,7 +147,17 @@ function generateYaml(data: OptionsData, values: Record<string, OptionValue>, pl
 
       } else if (opt.type === 'unknown') {
         addDesc(opt.description)
-        lines.push(`${pad}  ${DICT_UNKNOWNS.has(opt.name) ? '{}' : '[]'}`)
+        if (INVENTORY_OPTS.has(opt.name)) {
+          const dict = val as Record<string, number>
+          const entries = Object.entries(dict).filter(([, n]) => n > 0)
+          if (entries.length) {
+            entries.forEach(([item, n]) => lines.push(`${pad}  "${item}": ${n}`))
+          } else {
+            lines.push(`${pad}  {}`)
+          }
+        } else {
+          lines.push(`${pad}  ${DICT_UNKNOWNS.has(opt.name) ? '{}' : '[]'}`)
+        }
       }
     }
   }
@@ -333,8 +346,9 @@ function OptionSetOpt({ opt, value, onChange }: { opt: OptionDef; value: OptionV
     )
   }
 
-  const keys     = opt.valid_keys ?? []
-  const filtered = search ? keys.filter(k => k.toLowerCase().includes(search.toLowerCase())) : keys
+  const isLocation = ['start_location_hints', 'exclude_locations', 'priority_locations'].includes(opt.name)
+  const keys       = opt.valid_keys ?? []
+  const filtered   = search ? keys.filter(k => k.toLowerCase().includes(search.toLowerCase())) : keys
 
   return (
     <div>
@@ -344,7 +358,9 @@ function OptionSetOpt({ opt, value, onChange }: { opt: OptionDef; value: OptionV
           onChange={e => setSearch(e.target.value)}
           style={{ marginBottom: 8, display: 'block', fontSize: 11.5 }} />
       )}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, maxHeight: 200, overflowY: 'auto' }}>
+      <div style={isLocation
+        ? { display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 4, maxHeight: 200, overflowY: 'auto' }
+        : { display: 'flex', flexWrap: 'wrap', gap: 4, maxHeight: 200, overflowY: 'auto' }}>
         {filtered.map(k => (
           <label key={k} style={checkItemStyle(checked.has(k))}>
             <input type="checkbox" checked={checked.has(k)} onChange={() => toggle(k)}
@@ -357,19 +373,253 @@ function OptionSetOpt({ opt, value, onChange }: { opt: OptionDef; value: OptionV
   )
 }
 
-function OptionRow({ opt, value, onChange, isDefeatBosses }: {
-  opt: OptionDef; value: OptionValue; onChange: (v: OptionValue) => void; isDefeatBosses: boolean
+function imgUrl(name: string) {
+  return `ap-assets:///images/${name.toLowerCase().replace(/['\s]/g, '')}.png`
+}
+
+function StartInventoryOpt({ value, onChange, allItems }: {
+  value: Record<string, number>; onChange: (v: Record<string, number>) => void; allItems: string[]
 }) {
-  if (opt.type === 'unknown') return null
+  const [input,     setInput]     = useState('')
+  const [open,      setOpen]      = useState(false)
+  const [activeIdx, setActiveIdx] = useState(-1)
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const listRef = useRef<HTMLUListElement>(null)
+
+  const filtered = input.trim()
+    ? allItems.filter(n => !(n in value) && n.toLowerCase().includes(input.toLowerCase()))
+    : allItems.filter(n => !(n in value))
+
+  useEffect(() => { setActiveIdx(-1) }, [input])
+
+  useEffect(() => {
+    if (!open) return
+    function onDown(e: MouseEvent) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [open])
+
+  function select(name: string) {
+    onChange({ ...value, [name]: 1 })
+    setInput('')
+    setOpen(false)
+  }
+
+  function onKey(e: React.KeyboardEvent) {
+    if (!open && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) { setOpen(true); return }
+    if (!open) return
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      const next = Math.min(activeIdx + 1, filtered.length - 1)
+      setActiveIdx(next)
+      listRef.current?.children[next]?.scrollIntoView({ block: 'nearest' })
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      const prev = Math.max(activeIdx - 1, 0)
+      setActiveIdx(prev)
+      listRef.current?.children[prev]?.scrollIntoView({ block: 'nearest' })
+    } else if (e.key === 'Enter') {
+      if (activeIdx >= 0 && filtered[activeIdx]) select(filtered[activeIdx])
+    } else if (e.key === 'Escape') {
+      setOpen(false)
+    }
+  }
+
+  const setCount = (item: string, n: number) => {
+    const next = { ...value }
+    if (n <= 0) delete next[item]; else next[item] = n
+    onChange(next)
+  }
+
+  const entries = Object.entries(value).filter(([, n]) => n > 0)
+
+  return (
+    <div>
+      {entries.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginBottom: 8 }}>
+          {entries.map(([item, n]) => (
+            <div key={item} style={{ display: 'flex', alignItems: 'center', gap: 8,
+              background: 'var(--bg)', border: '1px solid var(--accent-2)',
+              borderRadius: 3, padding: '4px 8px' }}>
+              <img src={imgUrl(item)} alt="" style={{ width: 20, height: 20, objectFit: 'contain', flexShrink: 0 }}
+                onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+              <span style={{ flex: 1, fontSize: 12, color: 'var(--accent)', fontFamily: 'var(--mono)' }}>{item}</span>
+              <input type="number" min={1} max={99} value={n}
+                onChange={e => setCount(item, Math.max(1, Number(e.target.value)))}
+                style={{ width: 50, background: 'var(--bg-2)', border: '1px solid var(--rule-2)',
+                  color: 'var(--ink)', fontFamily: 'var(--mono)', fontSize: 12,
+                  padding: '2px 4px', borderRadius: 2, textAlign: 'center' }} />
+              <button type="button" onClick={() => setCount(item, 0)}
+                style={{ background: 'none', border: 'none', color: 'var(--ink-4)',
+                  cursor: 'pointer', fontSize: 13, padding: '0 2px', lineHeight: 1 }}>✕</button>
+            </div>
+          ))}
+        </div>
+      )}
+      <div ref={wrapRef} style={{ position: 'relative' }}>
+        <input className="input mono" style={{ width: '100%', fontSize: 12, boxSizing: 'border-box' }}
+          placeholder="Add item…"
+          value={input}
+          onChange={e => { setInput(e.target.value); setOpen(true) }}
+          onFocus={() => setOpen(true)}
+          onKeyDown={onKey} />
+        {open && filtered.length > 0 && (
+          <ul ref={listRef} style={{
+            position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 200,
+            margin: 0, padding: '4px 0', listStyle: 'none',
+            background: 'var(--bg-3)', border: '1px solid var(--rule-2)',
+            borderRadius: 5, maxHeight: 220, overflowY: 'auto',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+          }}>
+            {filtered.map((n, i) => (
+              <li key={n}
+                onMouseDown={() => select(n)}
+                onMouseEnter={() => setActiveIdx(i)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '5px 10px', cursor: 'default', fontSize: 12,
+                  background: i === activeIdx ? 'var(--accent-soft)' : 'transparent',
+                  color: i === activeIdx ? 'var(--ink)' : 'var(--ink-2)',
+                }}>
+                <img src={imgUrl(n)} alt="" style={{ width: 22, height: 22, objectFit: 'contain', flexShrink: 0 }}
+                  onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                <span className="mono">{n}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function ComboSetOpt({ value, onChange, allItems }: {
+  value: string[]; onChange: (v: string[]) => void; allItems: string[]
+}) {
+  const [input,     setInput]     = useState('')
+  const [open,      setOpen]      = useState(false)
+  const [activeIdx, setActiveIdx] = useState(-1)
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const listRef = useRef<HTMLUListElement>(null)
+  const selected = new Set(value)
+
+  const filtered = input.trim()
+    ? allItems.filter(n => !selected.has(n) && n.toLowerCase().includes(input.toLowerCase()))
+    : allItems.filter(n => !selected.has(n))
+
+  useEffect(() => { setActiveIdx(-1) }, [input])
+
+  useEffect(() => {
+    if (!open) return
+    function onDown(e: MouseEvent) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [open])
+
+  function select(name: string) {
+    onChange([...value, name])
+    setInput('')
+    setOpen(false)
+  }
+
+  function remove(name: string) {
+    onChange(value.filter(v => v !== name))
+  }
+
+  function onKey(e: React.KeyboardEvent) {
+    if (!open && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) { setOpen(true); return }
+    if (!open) return
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      const next = Math.min(activeIdx + 1, filtered.length - 1)
+      setActiveIdx(next)
+      listRef.current?.children[next]?.scrollIntoView({ block: 'nearest' })
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      const prev = Math.max(activeIdx - 1, 0)
+      setActiveIdx(prev)
+      listRef.current?.children[prev]?.scrollIntoView({ block: 'nearest' })
+    } else if (e.key === 'Enter') {
+      if (activeIdx >= 0 && filtered[activeIdx]) select(filtered[activeIdx])
+    } else if (e.key === 'Escape') {
+      setOpen(false)
+    }
+  }
+
+  return (
+    <div>
+      {value.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginBottom: 8 }}>
+          {value.map(item => (
+            <div key={item} style={{ display: 'flex', alignItems: 'center', gap: 8,
+              background: 'var(--bg)', border: '1px solid var(--accent-2)',
+              borderRadius: 3, padding: '4px 8px' }}>
+              <img src={imgUrl(item)} alt="" style={{ width: 20, height: 20, objectFit: 'contain', flexShrink: 0 }}
+                onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+              <span style={{ flex: 1, fontSize: 12, color: 'var(--accent)', fontFamily: 'var(--mono)' }}>{item}</span>
+              <button type="button" onClick={() => remove(item)}
+                style={{ background: 'none', border: 'none', color: 'var(--ink-4)',
+                  cursor: 'pointer', fontSize: 13, padding: '0 2px', lineHeight: 1 }}>✕</button>
+            </div>
+          ))}
+        </div>
+      )}
+      <div ref={wrapRef} style={{ position: 'relative' }}>
+        <input className="input mono" style={{ width: '100%', fontSize: 12, boxSizing: 'border-box' }}
+          placeholder="Add item…"
+          value={input}
+          onChange={e => { setInput(e.target.value); setOpen(true) }}
+          onFocus={() => setOpen(true)}
+          onKeyDown={onKey} />
+        {open && filtered.length > 0 && (
+          <ul ref={listRef} style={{
+            position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 200,
+            margin: 0, padding: '4px 0', listStyle: 'none',
+            background: 'var(--bg-3)', border: '1px solid var(--rule-2)',
+            borderRadius: 5, maxHeight: 220, overflowY: 'auto',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+          }}>
+            {filtered.map((n, i) => (
+              <li key={n}
+                onMouseDown={() => select(n)}
+                onMouseEnter={() => setActiveIdx(i)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '5px 10px', cursor: 'default', fontSize: 12,
+                  background: i === activeIdx ? 'var(--accent-soft)' : 'transparent',
+                  color: i === activeIdx ? 'var(--ink)' : 'var(--ink-2)',
+                }}>
+                <img src={imgUrl(n)} alt="" style={{ width: 22, height: 22, objectFit: 'contain', flexShrink: 0 }}
+                  onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                <span className="mono">{n}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function OptionRow({ opt, value, onChange, isDefeatBosses, allItems }: {
+  opt: OptionDef; value: OptionValue; onChange: (v: OptionValue) => void; isDefeatBosses: boolean; allItems: string[]
+}) {
+  if (opt.type === 'unknown' && !INVENTORY_OPTS.has(opt.name)) return null
   if (['number_of_bosses', 'bosses_available'].includes(opt.name) && !isDefeatBosses) return null
 
-  const isFullWidth = opt.type === 'option_set'
+  const isFullWidth = opt.type === 'option_set' || INVENTORY_OPTS.has(opt.name) || COMBO_ITEM_OPTS.has(opt.name)
 
   let control: React.ReactNode = null
-  if      (opt.type === 'choice')     control = <ChoiceOpt opt={opt} value={value} onChange={onChange} />
-  else if (opt.type === 'toggle')     control = <ToggleOpt value={value} onChange={onChange} />
-  else if (opt.type === 'range')      control = <RangeOpt opt={opt} value={value} onChange={onChange} />
-  else if (opt.type === 'option_set') control = <OptionSetOpt opt={opt} value={value} onChange={onChange} />
+  if      (opt.type === 'choice')             control = <ChoiceOpt opt={opt} value={value} onChange={onChange} />
+  else if (opt.type === 'toggle')             control = <ToggleOpt value={value} onChange={onChange} />
+  else if (opt.type === 'range')              control = <RangeOpt opt={opt} value={value} onChange={onChange} />
+  else if (COMBO_ITEM_OPTS.has(opt.name))     control = <ComboSetOpt value={value as string[]} onChange={onChange as (v: string[]) => void} allItems={allItems} />
+  else if (opt.type === 'option_set')         control = <OptionSetOpt opt={opt} value={value} onChange={onChange} />
+  else if (INVENTORY_OPTS.has(opt.name))      control = <StartInventoryOpt value={value as Record<string, number>} onChange={onChange as (v: Record<string, number>) => void} allItems={allItems} />
 
   return (
     <div style={{
@@ -387,7 +637,7 @@ function OptionRow({ opt, value, onChange, isDefeatBosses }: {
 // ── Main screen ───────────────────────────────────────────────────────────────
 
 export function YamlGeneratorScreen() {
-  const data                        = BUNDLED_DATA
+  const data                         = BUNDLED_DATA
   const [values,     setValues]     = useState<Record<string, OptionValue>>(() => buildDefaults(data))
   const [playerName, setPlayerName] = useState('')
   const [preset,     setPreset]     = useState('')
@@ -407,6 +657,7 @@ export function YamlGeneratorScreen() {
   }
 
   const download = () => {
+    if (!data) return
     const name = playerName.trim() || 'Player'
     const yaml = generateYaml(data, values, name)
     const blob = new Blob([yaml], { type: 'text/yaml' })
@@ -415,94 +666,99 @@ export function YamlGeneratorScreen() {
     URL.revokeObjectURL(url)
   }
 
-  const goalOpt         = data.groups.flatMap(g => g.options).find(o => o.name === 'goal')
-  const defeatBossesVal = goalOpt?.choices?.find(c => c.name === 'defeat_bosses')?.value
-  const isDefeatBosses  = values['goal'] === defeatBossesVal
+  const goalOpt          = data?.groups.flatMap(g => g.options).find(o => o.name === 'goal')
+  const defeatBossesVal  = goalOpt?.choices?.find(c => c.name === 'defeat_bosses')?.value
+  const isDefeatBosses   = values['goal'] === defeatBossesVal
+  const allItems         = data?.groups.flatMap(g => g.options).find(o => o.name === 'local_items')?.valid_keys ?? []
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
+      {/* Header */}
       <div className="page-header" style={{ flexShrink: 0 }}>
         <h1>Yaml Generator</h1>
         <div className="sub">Generate a <code>.yaml</code> config file for Archipelago multiworlds</div>
       </div>
 
-      {/* Meta row */}
-      <div style={{
-        padding: '12px 20px',
-        borderBottom: '1px solid var(--rule)',
-        display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'flex-end',
-        flexShrink: 0, background: 'var(--bg-2)',
-      }}>
-        <div>
-          <label className="label" htmlFor="yaml-player-name">Player Name</label>
-          <input id="yaml-player-name" className="input" type="text"
-            placeholder="Player" maxLength={16} value={playerName}
-            onChange={e => setPlayerName(e.target.value)}
-            style={{ width: 200 }} />
-        </div>
-        <div>
-          <label className="label" htmlFor="yaml-preset">Options Preset</label>
-          <select id="yaml-preset" className="input select" value={preset}
-            onChange={e => applyPreset(e.target.value)}
-            style={{ width: 240 }}>
-            <option value="">Default</option>
-            {Object.keys(data.presets).map(p => (
-              <option key={p} value={p}>{p}</option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      {/* Scrollable groups */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 20px' }}>
-        {data.groups.map(grp => {
-          const visibleOpts = grp.options.filter(o => {
-            if (o.type === 'unknown') return false
-            if (['number_of_bosses', 'bosses_available'].includes(o.name) && !isDefeatBosses) return false
-            return true
-          })
-          if (!visibleOpts.length) return null
-          return (
-            <details key={grp.name} open={grp.name !== 'Item & Location Options'}
-              style={{ background: 'var(--panel)', border: '1px solid var(--rule)', borderRadius: 4, marginBottom: 8, overflow: 'hidden' }}>
-              <summary style={{
-                fontFamily: 'var(--display)', fontSize: 13, color: 'var(--accent)',
-                padding: '10px 14px', cursor: 'pointer', userSelect: 'none',
-                borderBottom: '1px solid var(--rule)', letterSpacing: '0.05em',
-                listStyle: 'none', display: 'flex', alignItems: 'center', gap: 8,
-              }}>
-                <span style={{ fontFamily: 'var(--mono)', color: 'var(--accent-2)', fontSize: 16, lineHeight: 1 }}>▾</span>
-                {grp.name}
-              </summary>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
-                {grp.options.map(opt => (
-                  <OptionRow key={opt.name} opt={opt}
-                    value={values[opt.name] ?? defaultFor(opt)}
-                    onChange={setVal(opt.name)}
-                    isDefeatBosses={isDefeatBosses} />
+      <>
+          {/* Meta row */}
+          <div style={{
+            padding: '12px 20px',
+            borderBottom: '1px solid var(--rule)',
+            display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'flex-end',
+            flexShrink: 0, background: 'var(--bg-2)',
+          }}>
+            <div>
+              <label className="label" htmlFor="yaml-player-name">Player Name</label>
+              <input id="yaml-player-name" className="input" type="text"
+                placeholder="Player" maxLength={16} value={playerName}
+                onChange={e => setPlayerName(e.target.value)}
+                style={{ width: 200 }} />
+            </div>
+            <div>
+              <label className="label" htmlFor="yaml-preset">Options Preset</label>
+              <select id="yaml-preset" className="input select" value={preset}
+                onChange={e => applyPreset(e.target.value)}
+                style={{ width: 240 }}>
+                <option value="">Default</option>
+                {Object.keys(data.presets).map(p => (
+                  <option key={p} value={p}>{p}</option>
                 ))}
-              </div>
-            </details>
-          )
-        })}
-      </div>
+              </select>
+            </div>
+          </div>
 
-      {/* Download bar */}
-      <div style={{
-        flexShrink: 0,
-        background: 'var(--bg-2)',
-        borderTop: '1px solid var(--rule)',
-        padding: '10px 20px',
-        display: 'flex', alignItems: 'center', gap: 16,
-      }}>
-        <span style={{ fontSize: 11.5, color: 'var(--ink-3)', flex: 1 }}>
-          Options are not saved — download to keep them.
-        </span>
-        <button onClick={download} className="btn primary" style={{ fontSize: 13, padding: '8px 24px' }}>
-          ⬇ Download .yaml
-        </button>
-      </div>
+          {/* Scrollable groups */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '12px 20px' }}>
+            {data.groups.map(grp => {
+              const visibleOpts = grp.options.filter(o => {
+                if (o.type === 'unknown' && !INVENTORY_OPTS.has(o.name)) return false
+                if (['number_of_bosses', 'bosses_available'].includes(o.name) && !isDefeatBosses) return false
+                return true
+              })
+              if (!visibleOpts.length) return null
+              return (
+                <details key={grp.name} open
+                  style={{ background: 'var(--panel)', border: '1px solid var(--rule)', borderRadius: 4, marginBottom: 8, overflow: 'hidden' }}>
+                  <summary style={{
+                    fontFamily: 'var(--display)', fontSize: 13, color: 'var(--accent)',
+                    padding: '10px 14px', cursor: 'pointer', userSelect: 'none',
+                    borderBottom: '1px solid var(--rule)', letterSpacing: '0.05em',
+                    listStyle: 'none', display: 'flex', alignItems: 'center', gap: 8,
+                  }}>
+                    <span style={{ fontFamily: 'var(--mono)', color: 'var(--accent-2)', fontSize: 16, lineHeight: 1 }}>▾</span>
+                    {grp.name}
+                  </summary>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
+                    {grp.options.map(opt => (
+                      <OptionRow key={opt.name} opt={opt}
+                        value={values[opt.name] ?? defaultFor(opt)}
+                        onChange={setVal(opt.name)}
+                        isDefeatBosses={isDefeatBosses}
+                        allItems={allItems} />
+                    ))}
+                  </div>
+                </details>
+              )
+            })}
+          </div>
+
+          {/* Download bar */}
+          <div style={{
+            flexShrink: 0,
+            background: 'var(--bg-2)',
+            borderTop: '1px solid var(--rule)',
+            padding: '10px 20px',
+            display: 'flex', alignItems: 'center', gap: 16,
+          }}>
+            <span style={{ fontSize: 11.5, color: 'var(--ink-3)', flex: 1 }}>
+              Options are not saved — download to keep them.
+            </span>
+            <button onClick={download} className="btn primary" style={{ fontSize: 13, padding: '8px 24px' }}>
+              ⬇ Download .yaml
+            </button>
+          </div>
+      </>
     </div>
   )
 }
