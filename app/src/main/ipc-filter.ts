@@ -123,11 +123,16 @@ export async function handleZoneEntry(_zone: string): Promise<void> {
     if (locId !== undefined && missingSet.has(locId)) toCheck.add(locId)
   }
 
-  if (gameOpts.add_leveling_up_to_location_pool !== false && gggChar.level) {
+  if (gameOpts.LevelingUpAsLocations !== false && gggChar.level) {
     for (let level = 2; level <= gggChar.level; level++) {
       const loc = missingWithNames.find(l => l.name === `Reach Level ${level}`)
       if (loc) toCheck.add(loc.id)
     }
+  }
+
+  if (gameOpts.areaLocationsAsLocations !== false && _zone) {
+    const loc = missingWithNames.find(l => l.name === `Reach ${_zone}`)
+    if (loc) toCheck.add(loc.id)
   }
 
   if (errs.length > 0) {

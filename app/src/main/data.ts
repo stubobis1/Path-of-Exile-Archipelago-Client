@@ -65,6 +65,7 @@ function readJson<T>(name: string): T {
 }
 
 interface LevelLocation { name: string; level: number; act: number }
+interface AreaLocation { areaName: string; areaLevel: number; act: number }
 
 // Lazy-loaded singletons — parsed once on first access
 let _items:      APItem[]                        | null = null
@@ -72,6 +73,7 @@ let _baseItems:  APBaseItem[]                    | null = null
 let _bosses:     Record<string, APBoss>          | null = null
 let _altGems:    Record<string, AlternateGem>   | null = null
 let _levelLocs:  LevelLocation[]                | null = null
+let _areaLocs:   AreaLocation[]                 | null = null
 
 /** All AP item definitions (lazy-loaded from Items.json). */
 export function getItems(): APItem[] {
@@ -96,6 +98,11 @@ export function getAlternateGems(): Record<string, AlternateGem> {
 /** Level milestone locations (lazy-loaded from LevelLocations.json). */
 export function getLevelLocations(): LevelLocation[] {
   return (_levelLocs ??= readJson<LevelLocation[]>('LevelLocations.json'))
+}
+
+/** Area (zone) locations (lazy-loaded from AreaLocations.json). */
+export function getAreaLocations(): AreaLocation[] {
+  return (_areaLocs ??= readJson<AreaLocation[]>('AreaLocations.json'))
 }
 
 /** Look up a single AP item by name. */

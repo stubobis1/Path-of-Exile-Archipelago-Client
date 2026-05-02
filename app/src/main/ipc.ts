@@ -9,7 +9,7 @@ import { getCachedCharacter } from './services/gggApi'
 import { clientTxtWatcher } from './services/clientTxtWatcher'
 import { queueChatSend } from './services/gameInput'
 import { apSocket } from './services/apSocket'
-import { getItems, getBosses, getBaseItems, getLevelLocations } from './data'
+import { getItems, getBosses, getBaseItems, getLevelLocations, getAreaLocations } from './data'
 import { logger } from './services/logger'
 import { checkGoalZone, checkBossDrops } from './validation'
 import { state, patch, pushChat, timestamp, sc, setSettingsContext, setGameOpts, setPendingGoalToken } from './ipc-state'
@@ -123,6 +123,9 @@ export function initIpc(): void {
         for (const b of getBaseItems()) nameToAct[b.name] = b.act
         for (const boss of Object.values(getBosses())) nameToAct[boss.name] = '0_boss'
         for (const lvl of getLevelLocations()) nameToAct[lvl.name] = 'level'
+        for (const area of getAreaLocations()) {
+          if (area.areaLevel > 0) nameToAct[`Reach ${area.areaName}`] = area.act
+        }
         const rawLocs = apSocket.getAllLocationsWithNames()
         const locations = rawLocs.map(l => ({ ...l, act: nameToAct[l.name] ?? 'Other' }))
         patch({ locations })
