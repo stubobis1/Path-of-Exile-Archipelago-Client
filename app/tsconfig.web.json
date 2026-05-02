@@ -1,5 +1,5 @@
 {
-  "include": ["src/renderer/**/*"],
+  "include": ["src/renderer/**/*", "src/data/*.json"],
   "compilerOptions": {
     "composite": true,
     "target": "ES2022",

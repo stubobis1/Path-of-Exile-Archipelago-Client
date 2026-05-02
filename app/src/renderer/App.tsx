@@ -9,8 +9,9 @@ import { ItemsScreen } from './screens/Items'
 import { GoalScreen } from './screens/Goal'
 import { LocationsScreen } from './screens/Locations'
 import { SettingsScreen } from './screens/Settings'
+import { YamlGeneratorScreen } from './screens/YamlGenerator'
 
-type Screen = 'dashboard' | 'gear' | 'items' | 'locations' | 'goal' | 'settings' | 'setup'
+type Screen = 'dashboard' | 'gear' | 'items' | 'locations' | 'goal' | 'settings' | 'yaml' | 'setup'
 
 let listenersInited = false
 
@@ -60,6 +61,7 @@ export function App() {
           {screen === 'items'     && <ItemsScreen />}
           {screen === 'locations' && <LocationsScreen />}
           {screen === 'goal'      && <GoalScreen />}
+          {screen === 'yaml'      && <YamlGeneratorScreen />}
           {screen === 'settings'  && <SettingsScreen scrollTo={settingsSection} />}
           {screen === 'setup'     && <Onboarding onDone={() => setScreen('dashboard')} />}
         </div>

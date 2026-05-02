@@ -47,7 +47,8 @@ export function SettingsScreen({ scrollTo }: { scrollTo?: string }) {
   }
 
   const [paths, setPaths]           = useState({ clientTxt: '', docPath: '', baseFilter: '' })
-  const [whisper, setWhisper]       = useState(true)
+  const [whisper, setWhisper]           = useState(true)
+  const [goalChatVerify, setGoalChatVerify] = useState(true)
   const [filterDisplay, setFilterDisplay] = useState(0)
   const [filterSound,   setFilterSound]   = useState(2)
   const [delayEnter, setDelayEnter] = useState(0)
@@ -70,6 +71,7 @@ export function SettingsScreen({ scrollTo }: { scrollTo?: string }) {
         baseFilter: s.baseItemFilter  ?? '',
       })
       setWhisper(s.whisperUpdates  ?? true)
+      setGoalChatVerify(s.goalChatVerify ?? true)
       setFilterDisplay(s.filterDisplay ?? 0)
       setFilterSound(s.filterSound   ?? 2)
       setDelayEnter(s.inputDelayEnter ?? 0)
@@ -220,6 +222,12 @@ export function SettingsScreen({ scrollTo }: { scrollTo?: string }) {
             <Toggle on={deathlink} onChange={v => action({ type: 'setDeathlink', enabled: v })} />
           </Row>
         </Section>
+        <Section title="Goal">
+          <Row label="Chat verification" note="Send a whisper token to confirm your in-game identity when reaching the goal zone. Disable to mark the goal ready instantly on zone entry.">
+            <Toggle on={goalChatVerify} onChange={v => { setGoalChatVerify(v); save('goalChatVerify')(v) }} />
+          </Row>
+        </Section>
+
         <Section title="Paths" id="settings-paths">
           <Row label="Client.txt" note="PoE log file; tailed for zone changes, deaths, and chat commands.">
             <PathInput

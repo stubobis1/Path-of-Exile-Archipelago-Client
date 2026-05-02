@@ -9,6 +9,7 @@ const DEFAULTS: Settings = {
   slotName:         '',
   password:         '',
   whisperUpdates:   true,
+  goalChatVerify:   true,
   bypassFocusCheck: false,
   inputDelayEnter:      0,
   inputDelayPaste:      0,

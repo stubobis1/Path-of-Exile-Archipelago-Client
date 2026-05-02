@@ -126,6 +126,7 @@ Settings are persisted via `electron-store` in `%APPDATA%/poe-archipelago-client
 | `filterSound` | 0 = silent, 1 = default PoE alert, 2 = custom jingles per classification |
 | `deathlink` | Broadcast death events to all DeathLink participants |
 | `whisperUpdates` | Receive item-received notifications as in-game whispers |
+| `goalChatVerify` | When reaching the goal zone, send a whisper token to confirm in-game identity before enabling Send Goal. Disable to mark the goal ready instantly on zone entry (default: on) |
 | `ttsEnabled` / `ttsSpeed` | Windows TTS for item received announcements |
 
 ---

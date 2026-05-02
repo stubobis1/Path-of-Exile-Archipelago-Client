@@ -16,6 +16,7 @@ export interface Settings {
   password:       string
   // Preferences
   whisperUpdates:   boolean
+  goalChatVerify:   boolean
   bypassFocusCheck: boolean
   inputDelayEnter:      number
   inputDelayPaste:      number
