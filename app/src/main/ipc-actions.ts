@@ -7,7 +7,7 @@ import { settingsService } from './services/settings'
 import { startOAuthFlow, clearToken, tokenTimeLeft } from './services/oauth'
 import { getCachedCharacter, clearCharCache, fetchCharacterList } from './services/gggApi'
 import { clientTxtWatcher } from './services/clientTxtWatcher'
-import { openChatAndSend, queueChatSend } from './services/gameInput'
+import { openChatAndSend, queueChatSend, checkXdotool } from './services/gameInput'
 import { apSocket } from './services/apSocket'
 import { logger } from './services/logger'
 import { validateCharEquipment, validatePassivePoints } from './validation'
@@ -203,6 +203,12 @@ export async function handleAction(action: IpcAction): Promise<unknown> {
       clientTxtWatcher.stop()
       patch({ clientTxtOk: false })
       pushChat({ t: timestamp(), kind: 'sys', body: 'Monitoring stopped' })
+      return null
+    }
+
+    case 'checkXdotool': {
+      const ok = await checkXdotool()
+      patch({ xdotoolOk: ok })
       return null
     }
 

@@ -61,6 +61,17 @@ clientTxtWatcher.on(ev => {
   }
 })
 
+/** Returns `true` if xdotool is installed (always true on non-Linux). */
+export async function checkXdotool(): Promise<boolean> {
+  if (process.platform === 'win32') return true
+  try {
+    await execFileAsync('xdotool', ['--version'], { timeout: 2000 })
+    return true
+  } catch {
+    return false
+  }
+}
+
 /** Returns `true` if Path of Exile is the foreground window (or focus check is bypassed). */
 export async function isPoeFocused(): Promise<boolean> {
   const s = settingsService.get()
@@ -105,6 +116,7 @@ async function sendSequenceLinux(command: string): Promise<void> {
   await execFileAsync('xdotool', ['key', '--clearmodifiers', 'Return'],   { timeout: 3000, env })
   await delay(s.inputDelayPaste ?? 0)
   await execFileAsync('xdotool', ['key', '--clearmodifiers', 'ctrl+v'],   { timeout: 3000, env })
+  await execFileAsync('xdotool', ['keyup', 'ctrl', 'shift', 'alt', 'super'], { timeout: 3000, env })
   await delay(s.inputDelayEnter ?? 0)
   await execFileAsync('xdotool', ['key', '--clearmodifiers', 'Return'],   { timeout: 3000, env })
   clipboard.writeText(prev)

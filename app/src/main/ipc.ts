@@ -7,9 +7,9 @@ import { settingsService } from './services/settings'
 import { getValidToken, tokenTimeLeft } from './services/oauth'
 import { getCachedCharacter } from './services/gggApi'
 import { clientTxtWatcher } from './services/clientTxtWatcher'
-import { queueChatSend } from './services/gameInput'
+import { queueChatSend, checkXdotool } from './services/gameInput'
 import { apSocket } from './services/apSocket'
-import { getItems, getBosses, getBaseItems, getLevelLocations } from './data'
+import { getItems, getBosses, getBaseItems, getLevelLocations, getAreaLocations } from './data'
 import { logger } from './services/logger'
 import { checkGoalZone, checkBossDrops } from './validation'
 import { state, patch, pushChat, timestamp, sc, setSettingsContext, setGameOpts, setPendingGoalToken } from './ipc-state'
@@ -61,6 +61,10 @@ function flushItemWhisper(charName: string): void {
  */
 export function initIpc(): void {
   clearFilters()
+
+  if (process.platform !== 'win32') {
+    checkXdotool().then(ok => patch({ xdotoolOk: ok }))
+  }
 
   // Init oauth state from persisted token
   const token = getValidToken()
@@ -123,6 +127,9 @@ export function initIpc(): void {
         for (const b of getBaseItems()) nameToAct[b.name] = b.act
         for (const boss of Object.values(getBosses())) nameToAct[boss.name] = '0_boss'
         for (const lvl of getLevelLocations()) nameToAct[lvl.name] = 'level'
+        for (const area of getAreaLocations()) {
+          if (area.areaLevel > 0) nameToAct[`Reach ${area.areaName}`] = area.act
+        }
         const rawLocs = apSocket.getAllLocationsWithNames()
         const locations = rawLocs.map(l => ({ ...l, act: nameToAct[l.name] ?? 'Other' }))
         patch({ locations })
@@ -275,12 +282,23 @@ export function initIpc(): void {
       }
 
       if (state.goal && !state.goal.complete) {
-        // Zone-based goals: send token to char to verify in-game identity, then enable Send Goal
-        if (checkGoalZone(state.goal.type, ev.zone) && state.char && !state.goal.eligible) {
-          const token = Math.random().toString(36).slice(2, 8)
-          setPendingGoalToken(token)
-          queueChatSend(`@${state.char.name} ${token}`)
-          pushChat({ t: timestamp(), kind: 'sys', body: 'Goal zone reached — verifying character in-game...' })
+        // Zone-based goals: verify character is in the goal zone
+        if (checkGoalZone(state.goal.type, ev.zone) && !state.goal.eligible) {
+          const ws = settingsService.get(...sc())
+          if (ws.goalChatVerify && state.char) {
+            // Send a token whisper and wait for the char to echo it back
+            const token = Math.random().toString(36).slice(2, 8)
+            setPendingGoalToken(token)
+            queueChatSend(`@${state.char.name} ${token}`)
+            pushChat({ t: timestamp(), kind: 'sys', body: 'Goal zone reached — verifying character in-game...' })
+          } else {
+            // Direct: trust Client.txt zone entry, confirm character is known
+            const knownChar = state.char?.name ?? state.charName
+            if (knownChar) {
+              patch({ goal: { ...state.goal, eligible: true } })
+              pushChat({ t: timestamp(), kind: 'sys', body: 'Goal zone reached — click Send Goal to complete!' })
+            }
+          }
         }
         // Boss defeat goal — detect drops in inventory → check AP location
         // Goal state is updated when the AP server sends back the "defeat X" item

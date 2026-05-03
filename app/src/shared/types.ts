@@ -16,6 +16,7 @@ export interface Settings {
   password:       string
   // Preferences
   whisperUpdates:   boolean
+  goalChatVerify:   boolean
   bypassFocusCheck: boolean
   inputDelayEnter:      number
   inputDelayPaste:      number
@@ -199,6 +200,8 @@ export interface AppState {
   // onboarding
   onboardingStep: number
   onboardingDone: boolean
+  // linux only: false when xdotool is not found
+  xdotoolOk: boolean
 }
 
 declare global {
@@ -243,3 +246,4 @@ export type IpcAction =
   | { type: 'deleteConfigData' }
   | { type: 'requestFullState' }
   | { type: 'sendGoal' }
+  | { type: 'checkXdotool' }

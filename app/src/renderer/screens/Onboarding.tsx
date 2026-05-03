@@ -3,6 +3,7 @@ import { useStore } from '../store'
 import type { Settings } from '@shared/types'
 import { PathInput, FilterPathInput } from '../components/PathInput'
 import { CharacterPicker } from '../components/CharacterPicker'
+import { YamlGeneratorScreen } from './YamlGenerator'
 
 const STEPS = [
   { n: 1, label: 'Paths'     },
@@ -244,7 +245,8 @@ function Step5Ready({ onDone }: { onDone: () => void }) {
 }
 
 export function Onboarding({ onDone }: { onDone: () => void }) {
-  const [step, setStep] = useState(1)
+  const [step, setStep]       = useState(1)
+  const [yamlMode, setYamlMode] = useState(false)
   const { clientTxtPathOk, oauthStatus, connection, char } = useStore()
 
   const next = () => setStep(s => Math.min(s + 1, 5))
@@ -283,28 +285,43 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
             {STEPS.map((s, i) => {
               const st = stepState(s.n)
               return (
-                <div key={s.n} onClick={() => setStep(s.n)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', position: 'relative', cursor: 'pointer' }}>
+                <div key={s.n} onClick={() => { setYamlMode(false); setStep(s.n) }} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', position: 'relative', cursor: 'pointer' }}>
                   <div style={{
                     width: 22, height: 22, borderRadius: '50%',
-                    border: `1px solid ${st !== 'idle' ? 'var(--accent)' : 'var(--rule-2)'}`,
-                    background: st === 'done' ? 'var(--accent)' : 'transparent',
-                    color: st === 'done' ? '#1a1208' : st === 'active' ? 'var(--accent)' : 'var(--ink-3)',
+                    border: `1px solid ${!yamlMode && st !== 'idle' ? 'var(--accent)' : 'var(--rule-2)'}`,
+                    background: !yamlMode && st === 'done' ? 'var(--accent)' : 'transparent',
+                    color: !yamlMode && st === 'done' ? '#1a1208' : !yamlMode && st === 'active' ? 'var(--accent)' : 'var(--ink-3)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontFamily: 'var(--mono)', fontSize: 10, fontWeight: 600
                   }}>
-                    {st === 'done' ? CHECK : s.n}
+                    {!yamlMode && st === 'done' ? CHECK : s.n}
                   </div>
                   <span style={{
                     fontSize: 13,
-                    color: st === 'active' ? 'var(--ink)' : st === 'done' ? 'var(--ink-2)' : 'var(--ink-3)',
-                    fontWeight: st === 'active' ? 500 : 400
+                    color: !yamlMode && st === 'active' ? 'var(--ink)' : !yamlMode && st === 'done' ? 'var(--ink-2)' : 'var(--ink-3)',
+                    fontWeight: !yamlMode && st === 'active' ? 500 : 400
                   }}>{s.label}</span>
                   {i < STEPS.length - 1 && (
-                    <div style={{ position: 'absolute', left: 10, top: 32, width: 1, height: 14, background: st === 'done' ? 'var(--accent)' : 'var(--rule-2)' }} />
+                    <div style={{ position: 'absolute', left: 10, top: 32, width: 1, height: 14, background: !yamlMode && st === 'done' ? 'var(--accent)' : 'var(--rule-2)' }} />
                   )}
                 </div>
               )
             })}
+
+            <div style={{ borderTop: '1px solid var(--rule)', marginTop: 12, paddingTop: 12 }}>
+              <div onClick={() => setYamlMode(true)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', cursor: 'pointer' }}>
+                <div style={{
+                  width: 22, height: 22, borderRadius: '50%',
+                  border: `1px solid ${yamlMode ? 'var(--accent)' : 'var(--rule-2)'}`,
+                  color: yamlMode ? 'var(--accent)' : 'var(--ink-4)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 11,
+                }}>⚙</div>
+                <span style={{ fontSize: 13, color: yamlMode ? 'var(--ink)' : 'var(--ink-3)', fontWeight: yamlMode ? 500 : 400 }}>
+                  YAML Generator
+                </span>
+              </div>
+            </div>
           </div>
 
           <div className="spacer" />
@@ -313,23 +330,29 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
           </div>
         </aside>
 
-        <div style={{ flex: 1, overflow: 'auto', padding: '48px 56px' }}>
-          <div className="mono" style={{ fontSize: 10.5, letterSpacing: '.1em', color: 'var(--accent)', textTransform: 'uppercase', marginBottom: 10 }}>
-            Step {step}
-          </div>
-          <h1 style={{ fontFamily: 'var(--display)', fontWeight: 400, fontSize: 40, lineHeight: 1, letterSpacing: '-.01em', margin: '0 0 24px' }}>
-            {step === 1 && 'Set your paths, Exile.'}
-            {step === 2 && 'Login.'}
-            {step === 3 && 'Connect to Archipelago server.'}
-            {step === 4 && 'Choose your character.'}
-            {step === 5 && "You're ready."}
-          </h1>
+        <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          {yamlMode ? (
+            <YamlGeneratorScreen />
+          ) : (
+            <div style={{ flex: 1, overflow: 'auto', padding: '48px 56px' }}>
+              <div className="mono" style={{ fontSize: 10.5, letterSpacing: '.1em', color: 'var(--accent)', textTransform: 'uppercase', marginBottom: 10 }}>
+                Step {step}
+              </div>
+              <h1 style={{ fontFamily: 'var(--display)', fontWeight: 400, fontSize: 40, lineHeight: 1, letterSpacing: '-.01em', margin: '0 0 24px' }}>
+                {step === 1 && 'Set your paths, Exile.'}
+                {step === 2 && 'Login.'}
+                {step === 3 && 'Connect to Archipelago server.'}
+                {step === 4 && 'Choose your character.'}
+                {step === 5 && "You're ready."}
+              </h1>
 
-          {step === 1 && <Step1Paths onNext={next} />}
-          {step === 2 && <Step2OAuth onNext={next} />}
-          {step === 3 && <Step3Connect onNext={next} />}
-          {step === 4 && <Step4Character onNext={next} />}
-          {step === 5 && <Step5Ready onDone={onDone} />}
+              {step === 1 && <Step1Paths onNext={next} />}
+              {step === 2 && <Step2OAuth onNext={next} />}
+              {step === 3 && <Step3Connect onNext={next} />}
+              {step === 4 && <Step4Character onNext={next} />}
+              {step === 5 && <Step5Ready onDone={onDone} />}
+            </div>
+          )}
         </div>
     </div>
   )

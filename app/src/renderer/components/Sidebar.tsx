@@ -3,7 +3,7 @@ import logoUrl from '@resources/poeAP.png'
 
 const { clientVersion, backwardsCompatibleVersions } = window.electronAPI.poeVersion
 
-type Screen = 'dashboard' | 'gear' | 'items' | 'locations' | 'goal' | 'settings' | 'setup'
+type Screen = 'dashboard' | 'gear' | 'items' | 'locations' | 'goal' | 'settings' | 'yaml' | 'setup'
 
 interface SidebarProps {
   active:    Screen
@@ -20,6 +20,7 @@ const NAV: { id: Screen; label: string; icon: string }[] = [
 ]
 
 const NAV_BOTTOM: { id: Screen; label: string; icon: string }[] = [
+  { id: 'yaml',  label: 'Yaml Gen',        icon: '≡' },
   { id: 'setup', label: 'First-time Setup', icon: '◑' },
 ]
 
