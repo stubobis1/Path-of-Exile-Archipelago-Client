@@ -200,6 +200,8 @@ export interface AppState {
   // onboarding
   onboardingStep: number
   onboardingDone: boolean
+  // linux only: false when xdotool is not found
+  xdotoolOk: boolean
 }
 
 declare global {
@@ -244,3 +246,4 @@ export type IpcAction =
   | { type: 'deleteConfigData' }
   | { type: 'requestFullState' }
   | { type: 'sendGoal' }
+  | { type: 'checkXdotool' }

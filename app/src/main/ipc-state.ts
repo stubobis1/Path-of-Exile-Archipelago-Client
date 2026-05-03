@@ -18,6 +18,7 @@ export let state: AppState = {
   items:           [],
   chat:            [],
   goal:            null,
+  totalGearUnlocks: 0,
   errors:          [],
   deathlink:       false,
   whisperUpdates:  true,
@@ -25,6 +26,7 @@ export let state: AppState = {
   locations:       [],
   onboardingStep:  1,
   onboardingDone:  false,
+  xdotoolOk:       true,
 }
 
 export function patch(delta: Partial<AppState>): void {

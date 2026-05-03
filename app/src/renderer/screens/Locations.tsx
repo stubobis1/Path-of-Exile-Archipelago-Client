@@ -24,6 +24,8 @@ function locDisplayName(name: string): string {
   return name.replace(/\s*-\s*(early\s+)?act\s+\d+$/i, '')
 }
 
+const AREA_LOC_ID_START = 42000
+
 function ActSection({ label, locs }: { label: string; locs: APLocation[] }) {
   const [collapsed, setCollapsed] = useState(true)
   const total   = locs.length
@@ -31,9 +33,11 @@ function ActSection({ label, locs }: { label: string; locs: APLocation[] }) {
   const pct     = total > 0 && doneN > 0 ? Math.round(doneN / total * 100) : 0
   const complete = doneN === total && total > 0
 
-  const sorted = [...locs].sort((a, b) =>
+  const sortFn = (a: APLocation, b: APLocation) =>
     locDisplayName(a.name).localeCompare(locDisplayName(b.name), undefined, { numeric: true })
-  )
+
+  const regular = [...locs.filter(l => l.id < AREA_LOC_ID_START)].sort(sortFn)
+  const areas   = [...locs.filter(l => l.id >= AREA_LOC_ID_START)].sort(sortFn)
 
   return (
     <div className="act-section">
@@ -47,11 +51,21 @@ function ActSection({ label, locs }: { label: string; locs: APLocation[] }) {
       </div>
       {!collapsed && (
         <div className="act-locations">
-          {sorted.map(l => (
+          {regular.map(l => (
             <span key={l.id} className={`loc-tag ${l.checked ? 'checked' : 'unchecked'}`}>
               {locDisplayName(l.name)}
             </span>
           ))}
+          {areas.length > 0 && (
+            <>
+              <div className="loc-separator"><span>Areas</span></div>
+              {areas.map(l => (
+                <span key={l.id} className={`loc-tag ${l.checked ? 'checked' : 'unchecked'}`}>
+                  {locDisplayName(l.name)}
+                </span>
+              ))}
+            </>
+          )}
         </div>
       )}
     </div>

@@ -31,6 +31,7 @@ const INITIAL: AppState = {
   locations:       [],
   onboardingStep:  1,
   onboardingDone:  false,
+  xdotoolOk:       true,
 }
 
 export const useStore = create<Store>((set) => ({

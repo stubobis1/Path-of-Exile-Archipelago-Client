@@ -211,19 +211,27 @@ function checkItemStyle(active: boolean): React.CSSProperties {
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function Tip({ text }: { text: string }) {
-  const [show, setShow] = useState(false)
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null)
+  const iconRef = useRef<HTMLSpanElement>(null)
+
+  const show = () => {
+    const r = iconRef.current?.getBoundingClientRect()
+    if (r) setPos({ x: r.left, y: r.top - 8 })
+  }
+
   return (
-    <span style={{ position: 'relative', display: 'inline-block' }}
-      onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)}>
-      <span style={{
+    <span style={{ display: 'inline-block' }}
+      onMouseEnter={show} onMouseLeave={() => setPos(null)}>
+      <span ref={iconRef} style={{
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         width: 13, height: 13, borderRadius: '50%', border: '1px solid var(--ink-4)',
         color: 'var(--ink-4)', fontSize: 8.5, cursor: 'help', flexShrink: 0,
         fontFamily: 'var(--mono)',
       }}>?</span>
-      {show && (
+      {pos && (
         <div style={{
-          position: 'absolute', left: '1.2rem', top: -4, zIndex: 200,
+          position: 'fixed', left: pos.x, top: pos.y, transform: 'translateY(-100%)',
+          zIndex: 9999,
           background: 'var(--panel-2)', border: '1px solid var(--rule-2)',
           color: 'var(--ink-2)', fontSize: 11, lineHeight: 1.5,
           padding: '6px 10px', borderRadius: 3, width: 260,
@@ -350,6 +358,40 @@ function OptionSetOpt({ opt, value, onChange }: { opt: OptionDef; value: OptionV
   const keys       = opt.valid_keys ?? []
   const filtered   = search ? keys.filter(k => k.toLowerCase().includes(search.toLowerCase())) : keys
 
+  if (isLocation) {
+    const regularLocs = filtered.filter(k => !k.startsWith('Reach '))
+    const areaLocs    = filtered.filter(k => k.startsWith('Reach '))
+    const gridStyle: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 4 }
+    const checkItem = (k: string) => (
+      <label key={k} style={checkItemStyle(checked.has(k))}>
+        <input type="checkbox" checked={checked.has(k)} onChange={() => toggle(k)}
+          style={{ accentColor: 'var(--accent)', margin: 0, cursor: 'pointer' }} />
+        {k.replace(/_/g, ' ')}
+      </label>
+    )
+    return (
+      <div>
+        {actions}
+        {keys.length > 20 && (
+          <input type="text" className="input" placeholder="Search…" value={search}
+            onChange={e => setSearch(e.target.value)}
+            style={{ marginBottom: 8, display: 'block', fontSize: 11.5 }} />
+        )}
+        <div style={{ maxHeight: 200, overflowY: 'auto' }}>
+          {regularLocs.length > 0 && <div style={gridStyle}>{regularLocs.map(checkItem)}</div>}
+          {regularLocs.length > 0 && areaLocs.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '8px 0 6px' }}>
+              <hr style={{ flex: 1, border: 'none', borderTop: '1px solid var(--rule)', margin: 0 }} />
+              <span style={{ fontSize: 9.5, color: 'var(--ink-4)', fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>Areas</span>
+              <hr style={{ flex: 1, border: 'none', borderTop: '1px solid var(--rule)', margin: 0 }} />
+            </div>
+          )}
+          {areaLocs.length > 0 && <div style={gridStyle}>{areaLocs.map(checkItem)}</div>}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div>
       {actions}
@@ -358,9 +400,7 @@ function OptionSetOpt({ opt, value, onChange }: { opt: OptionDef; value: OptionV
           onChange={e => setSearch(e.target.value)}
           style={{ marginBottom: 8, display: 'block', fontSize: 11.5 }} />
       )}
-      <div style={isLocation
-        ? { display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 4, maxHeight: 200, overflowY: 'auto' }
-        : { display: 'flex', flexWrap: 'wrap', gap: 4, maxHeight: 200, overflowY: 'auto' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, maxHeight: 200, overflowY: 'auto' }}>
         {filtered.map(k => (
           <label key={k} style={checkItemStyle(checked.has(k))}>
             <input type="checkbox" checked={checked.has(k)} onChange={() => toggle(k)}
@@ -671,6 +711,25 @@ export function YamlGeneratorScreen() {
   const isDefeatBosses   = values['goal'] === defeatBossesVal
   const allItems         = data?.groups.flatMap(g => g.options).find(o => o.name === 'local_items')?.valid_keys ?? []
 
+  const existingChar = isDefeatBosses
+    && Number(values['add_leveling_up_to_location_pool']) === 0
+    && Number(values['add_area_locations_to_location_pool']) === 0
+
+  const toggleExistingChar = () => {
+    if (existingChar) {
+      // uncheck — revert goal back to default
+      const goalDef = defaultFor(goalOpt!)
+      setValues(prev => ({ ...prev, goal: goalDef }))
+    } else {
+      setValues(prev => ({
+        ...prev,
+        goal: defeatBossesVal!,
+        add_leveling_up_to_location_pool: 0,
+        add_area_locations_to_location_pool: 0,
+      }))
+    }
+  }
+
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
@@ -706,6 +765,11 @@ export function YamlGeneratorScreen() {
                 ))}
               </select>
             </div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 7, cursor: 'pointer', paddingBottom: 4, userSelect: 'none', fontSize: 12.5, color: existingChar ? 'var(--accent)' : 'var(--ink-2)' }}>
+              <input type="checkbox" checked={existingChar} onChange={toggleExistingChar}
+                style={{ accentColor: 'var(--accent)', cursor: 'pointer', width: 14, height: 14 }} />
+              Existing Character
+            </label>
           </div>
 
           {/* Scrollable groups */}
@@ -718,15 +782,15 @@ export function YamlGeneratorScreen() {
               })
               if (!visibleOpts.length) return null
               return (
-                <details key={grp.name} open
-                  style={{ background: 'var(--panel)', border: '1px solid var(--rule)', borderRadius: 4, marginBottom: 8, overflow: 'hidden' }}>
+                <details key={grp.name} open={!['Item & Location Options', 'Other'].includes(grp.name)}
+                  style={{ background: 'var(--panel)', border: '1px solid var(--rule)', borderRadius: 4, marginBottom: 8 }}>
                   <summary style={{
                     fontFamily: 'var(--display)', fontSize: 13, color: 'var(--accent)',
                     padding: '10px 14px', cursor: 'pointer', userSelect: 'none',
                     borderBottom: '1px solid var(--rule)', letterSpacing: '0.05em',
                     listStyle: 'none', display: 'flex', alignItems: 'center', gap: 8,
                   }}>
-                    <span style={{ fontFamily: 'var(--mono)', color: 'var(--accent-2)', fontSize: 16, lineHeight: 1 }}>▾</span>
+                    <span className="details-arrow" style={{ fontFamily: 'var(--mono)', color: 'var(--accent-2)', fontSize: 16, lineHeight: 1 }}>▾</span>
                     {grp.name}
                   </summary>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>

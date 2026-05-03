@@ -38,6 +38,34 @@ function ChatLine({ msg }: { msg: ChatMessage }) {
   )
 }
 
+function HelpTooltip({ text }: { text: string }) {
+  const [show, setShow] = useState(false)
+  return (
+    <div style={{ position: 'relative', display: 'inline-flex' }}
+      onMouseEnter={() => setShow(true)}
+      onMouseLeave={() => setShow(false)}
+    >
+      <span style={{
+        width: 15, height: 15, borderRadius: '50%',
+        border: '1px solid var(--ink-4)',
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 9.5, color: 'var(--ink-4)', cursor: 'help', userSelect: 'none', flexShrink: 0,
+      }}>?</span>
+      {show && (
+        <div style={{
+          position: 'absolute', right: 0, bottom: 'calc(100% + 6px)',
+          background: 'var(--bg-1, #1a1a1a)', border: '1px solid var(--rule)',
+          borderRadius: 5, padding: '8px 10px',
+          fontSize: 11, color: 'var(--ink-2)',
+          whiteSpace: 'pre', zIndex: 100, minWidth: 240,
+          pointerEvents: 'none', lineHeight: 1.6,
+          boxShadow: '0 4px 16px rgba(0,0,0,0.6)',
+        }}>{text}</div>
+      )}
+    </div>
+  )
+}
+
 function StatusRow({ ok, neutral, warn, label, cta }: { ok: boolean; neutral?: boolean; warn?: boolean; label: string; cta?: React.ReactNode }) {
   const dotColor = ok ? 'var(--ok)' : warn ? '#c8a020' : neutral ? 'var(--ink-4)' : 'var(--err)'
   const glow = ok ? '0 0 6px var(--ok)' : warn ? '0 0 4px #c8a020' : neutral ? 'none' : '0 0 4px var(--err)'
@@ -55,7 +83,7 @@ function StatusRow({ ok, neutral, warn, label, cta }: { ok: boolean; neutral?: b
 }
 
 function StatusCard({ onNavigate }: { onNavigate: (screen: string, section?: string) => void }) {
-  const { connection, serverAddr, char, charName, clientTxtPathOk, docPathOk, filterOk, clientTxtOk, oauthStatus, oauthDaysLeft } = useStore()
+  const { connection, serverAddr, char, charName, clientTxtPathOk, docPathOk, filterOk, clientTxtOk, oauthStatus, oauthDaysLeft, xdotoolOk } = useStore()
   const action = useStore(s => s.action)
   const connected = connection === 'connected'
 
@@ -119,6 +147,18 @@ function StatusCard({ onNavigate }: { onNavigate: (screen: string, section?: str
             : undefined}
         />
         <StatusRow ok={clientTxtOk} label={clientTxtOk ? 'Monitoring' : 'Not monitoring'} />
+        {!xdotoolOk && (
+          <StatusRow
+            ok={false}
+            label="xdotool not installed"
+            cta={<div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <button className="btn sm" style={{ fontSize: 10, padding: '2px 6px' }} onClick={() => action({ type: 'checkXdotool' })}>↺</button>
+              <HelpTooltip text={
+                'xdotool is required to send chat on Linux.\nInstall it with your package manager:\n\n  Debian/Ubuntu:  sudo apt install xdotool\n\n  Arch/Manjaro:   sudo pacman -S xdotool\n\n  Fedora:         sudo dnf install xdotool\n\n  SteamOS:        sudo steamos-devmode enable\n                  sudo pacman -S xdotool'
+              } />
+            </div>}
+          />
+        )}
       </div>
     </div>
   )

@@ -7,7 +7,7 @@ import { settingsService } from './services/settings'
 import { getValidToken, tokenTimeLeft } from './services/oauth'
 import { getCachedCharacter } from './services/gggApi'
 import { clientTxtWatcher } from './services/clientTxtWatcher'
-import { queueChatSend } from './services/gameInput'
+import { queueChatSend, checkXdotool } from './services/gameInput'
 import { apSocket } from './services/apSocket'
 import { getItems, getBosses, getBaseItems, getLevelLocations, getAreaLocations } from './data'
 import { logger } from './services/logger'
@@ -61,6 +61,10 @@ function flushItemWhisper(charName: string): void {
  */
 export function initIpc(): void {
   clearFilters()
+
+  if (process.platform !== 'win32') {
+    checkXdotool().then(ok => patch({ xdotoolOk: ok }))
+  }
 
   // Init oauth state from persisted token
   const token = getValidToken()
