@@ -209,7 +209,7 @@ function MonitoringCard() {
 }
 
 function ItemsPanel({ onNavigate }: { onNavigate: (screen: string, section?: string) => void }) {
-  const { items, char, goal, errors } = useStore()
+  const { items, char, goal, errors, locations } = useStore()
 
   const byCategory = (cat: string) => items.filter(i => i.category?.some(c => c.includes(cat))).length
   const gems         = byCategory('Gem')
@@ -243,23 +243,45 @@ function ItemsPanel({ onNavigate }: { onNavigate: (screen: string, section?: str
         </div>
       )}
 
-      {/* Items received */}
       <div>
-        <SectionLabel>Items received · {items.length}</SectionLabel>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5 }}>
-          <StatCard label="Gems"    value={gems} />
-          <StatCard label="Armour"  value={armour} />
-          <StatCard label="Weapons" value={weapons} />
-          <StatCard label="Flasks"  value={flasks} />
-          <StatCard label="Passive pts" value={passivePoints} sub="from multiworld" />
-          {allocatedPassives !== null && (
-            <StatCard label="Allocated" value={allocatedPassives} sub="on passive tree" />
-          )}
+          <div style={{ padding: '7px 10px', background: 'var(--bg-3)', borderRadius: 5, border: '1px solid var(--rule)' }}>
+            <div className="mono muted" style={{ fontSize: 9.5, textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 4 }}>Passive Pts</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              <span style={{ fontSize: 12, color: 'var(--accent)' }}>{allocatedPassives ?? '—'} <span style={{ fontSize: 10, color: 'var(--ink-3)' }}>allocated</span></span>
+              <span style={{ fontSize: 10, color: 'var(--ink-4)' }}>────────</span>
+              <span style={{ fontSize: 12, color: 'var(--accent)' }}>{passivePoints} <span style={{ fontSize: 10, color: 'var(--ink-3)' }}>unlocked</span></span>
+            </div>
+          </div>
+          <div style={{ padding: '7px 10px', background: 'var(--bg-3)', borderRadius: 5, border: '1px solid var(--rule)' }}>
+            <div className="mono muted" style={{ fontSize: 9.5, textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 4 }}>Items</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              <span style={{ fontSize: 12, color: 'var(--accent)' }}>{items.length} <span style={{ fontSize: 10, color: 'var(--ink-3)' }}>received</span></span>
+              <span style={{ fontSize: 10, color: 'var(--ink-4)' }}>────────</span>
+              <span style={{ fontSize: 12, color: 'var(--accent)' }}>{locations.length} <span style={{ fontSize: 10, color: 'var(--ink-3)' }}>total</span></span>
+            </div>
+          </div>
+          <div style={{ padding: '7px 10px', background: 'var(--bg-3)', borderRadius: 5, border: '1px solid var(--rule)' }}>
+            <div className="mono muted" style={{ fontSize: 9.5, textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 4 }}>Locations</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              <span style={{ fontSize: 12, color: 'var(--accent)' }}>{locations.filter(l => l.checked).length} <span style={{ fontSize: 10, color: 'var(--ink-3)' }}>checked</span></span>
+              <span style={{ fontSize: 10, color: 'var(--ink-4)' }}>────────</span>
+              <span style={{ fontSize: 12, color: 'var(--accent)' }}>{locations.length} <span style={{ fontSize: 10, color: 'var(--ink-3)' }}>total</span></span>
+            </div>
+          </div>
+          <div style={{ padding: '7px 10px', background: 'var(--bg-3)', borderRadius: 5, border: '1px solid var(--rule)' }}>
+            <div className="mono muted" style={{ fontSize: 9.5, textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 4 }}>Goal</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              <span style={{ fontSize: 12, color: 'var(--accent)' }}>{goal?.defeated?.length ?? 0} <span style={{ fontSize: 10, color: 'var(--ink-3)' }}>defeated</span></span>
+              <span style={{ fontSize: 10, color: 'var(--ink-4)' }}>────────</span>
+              <span style={{ fontSize: 12, color: 'var(--accent)' }}>{goal?.bosses?.length ?? '—'} <span style={{ fontSize: 10, color: 'var(--ink-3)' }}>total</span></span>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Goal */}
-      {goal && (
+      {/* {goal && (
         <div>
           <SectionLabel>Goal</SectionLabel>
           <div style={{ padding: '10px 14px', background: goal.complete ? 'color-mix(in srgb, var(--ok) 12%, var(--bg-3))' : 'var(--bg-3)', borderRadius: 6, border: `1px solid ${goal.complete ? 'var(--ok)' : 'var(--rule)'}` }}>
@@ -278,7 +300,7 @@ function ItemsPanel({ onNavigate }: { onNavigate: (screen: string, section?: str
             )}
           </div>
         </div>
-      )}
+      )} */}
 
       
     </div>

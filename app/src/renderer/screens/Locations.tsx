@@ -198,7 +198,7 @@ export function LocationsScreen() {
         <h1>Locations</h1>
         <div className="sub">{connection === 'connected' ? `${checked} / ${total} checked` : 'not connected'}</div>
       </div>
-      <div style={{ padding: '24px 28px', maxWidth: 900 }}>
+      <div style={{ padding: '24px 28px' }}>
         {locations.length === 0 && (
           <div style={{ color: 'var(--ink-3)', fontSize: 13, textAlign: 'center', padding: '60px 0' }}>
             {connection === 'connected'

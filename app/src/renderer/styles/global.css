@@ -291,7 +291,7 @@ details:not([open]) .details-arrow { transform: rotate(-90deg); }
 .act-bar-wrap { flex: 1; background: var(--bg-3); height: 5px; border-radius: 3px; overflow: hidden; min-width: 80px; max-width: 200px; }
 .act-bar { height: 100%; background: color-mix(in oklch, var(--ok) 55%, transparent); border-radius: 3px; transition: width 0.3s; }
 .act-bar.complete { background: var(--ok); }
-.act-locations { background: var(--bg-2); border: 1px solid var(--rule); border-top: none; border-radius: 0 0 3px 3px; padding: 6px; display: flex; flex-wrap: wrap; gap: 4px; }
+.act-locations { background: var(--bg-2); border: 1px solid var(--rule); border-top: none; border-radius: 0 0 3px 3px; padding: 6px; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 4px; }
 .loc-tag { font-family: var(--mono); font-size: 10.5px; padding: 2px 7px; border-radius: 2px; border: 1px solid var(--rule); color: var(--ink-3); }
 .loc-tag.checked   { color: var(--ok); border-color: color-mix(in oklch, var(--ok) 40%, var(--rule)); text-decoration: line-through; opacity: .7; }
 .loc-tag.unchecked { color: var(--ink-2); border-color: var(--rule-2); }
