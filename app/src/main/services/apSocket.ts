@@ -46,7 +46,7 @@ function createAPSocket() {
       _slot  = slotName
 
       client.socket.on('roomInfo', () => {
-        logger.info('[AP] RoomInfo received — sending Connect packet')
+        logger.info('[AP] RoomInfo received -- sending Connect packet')
       })
 
       client.socket.on('sentPackets', (pkts: any[]) => {
@@ -138,14 +138,14 @@ function createAPSocket() {
       try {
         const emitHint = (h: any) => emit({
           type:     'hint',
-          finder:   h.findingPlayer?.alias ?? h.finding_player ?? '',
-          receiver: h.receivingPlayer?.alias ?? h.receiving_player ?? '',
-          location: h.locationName ?? h.location_name ?? '',
-          item:     h.itemName ?? h.item_name ?? '',
+          finder:   h.item?.sender?.alias ?? h.findingPlayer?.alias ?? h.finding_player ?? '',
+          receiver: h.item?.receiver?.alias ?? h.receivingPlayer?.alias ?? h.receiving_player ?? '',
+          location: h.item?.locationName ?? h.locationName ?? h.location_name ?? '',
+          item:     h.item?.name ?? h.itemName ?? h.item_name ?? '',
         })
-        if (client.hints?.on) {
-          client.hints.on('hintsInitialized', (hints: any[]) => hints.forEach(emitHint))
-          client.hints.on('hintReceived',     emitHint)
+        if (client.items?.on) {
+          client.items.on('hintsInitialized', (hints: any[]) => hints.forEach(emitHint))
+          client.items.on('hintReceived',     emitHint)
         }
       } catch { /* hints API unavailable */ }
 

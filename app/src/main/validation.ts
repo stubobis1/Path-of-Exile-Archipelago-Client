@@ -83,13 +83,25 @@ export function validateCharEquipment(char: GGGCharacter, ctx: ValidationCtx): V
     if (inv === 'Ring')  { const e = rarityCheck(receivedNames, ft, 'Ring (left)');  if (e) errors.push({ slot: inv, msg: e }) }
     if (inv === 'Ring2') { const e = rarityCheck(receivedNames, ft, 'Ring (right)'); if (e) errors.push({ slot: inv, msg: e }) }
 
-    // Weapon/offhand — detect type from item properties
+    // Weapon/offhand — detect type from item typeLine first, then properties
     if (inv === 'Weapon' || inv === 'Offhand') {
-      for (const prop of (item.properties ?? []) as { name: string }[]) {
-        for (const wt of WEAPON_TYPES) {
-          if (prop.name?.toLowerCase().endsWith(wt.toLowerCase())) {
-            const e = rarityCheck(receivedNames, ft, wt)
-            if (e) errors.push({ slot: inv, msg: e })
+      const typeLine = (item.typeLine ?? '').toLowerCase()
+      let matched = false
+      for (const wt of WEAPON_TYPES) {
+        if (typeLine.endsWith(wt.toLowerCase())) {
+          const e = rarityCheck(receivedNames, ft, wt)
+          if (e) errors.push({ slot: inv, msg: e })
+          matched = true
+          break
+        }
+      }
+      if (!matched) {
+        for (const prop of (item.properties ?? []) as { name: string }[]) {
+          for (const wt of WEAPON_TYPES) {
+            if (prop.name?.toLowerCase().endsWith(wt.toLowerCase())) {
+              const e = rarityCheck(receivedNames, ft, wt)
+              if (e) errors.push({ slot: inv, msg: e })
+            }
           }
         }
       }

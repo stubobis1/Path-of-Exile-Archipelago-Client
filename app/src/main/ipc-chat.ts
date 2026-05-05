@@ -76,9 +76,9 @@ function goalMessage(): string {
   const name = GOAL_NAMES[g.type] ?? `Goal type ${g.type}`
   if (g.type === 10 && g.bosses?.length) {
     const parts = g.bosses.map(b => (g.defeated.includes(b) ? `✓${b}` : `✗${b}`))
-    return `${name}: ${parts.join(' ')}${g.complete ? ' — ALL DONE!' : ''}`
+    return `${name}: ${parts.join(' ')}${g.complete ? ' - ALL DONE!' : ''}`
   }
-  return `${name} — ${g.complete ? 'complete!' : 'in progress'}`
+  return `${name} - ${g.complete ? 'complete!' : 'in progress'}`
 }
 
 async function sendGameChat(resp: string): Promise<void> {

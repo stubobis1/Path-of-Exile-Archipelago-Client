@@ -40,12 +40,10 @@ function categorizeItem(item: ReceivedItem): string {
   if (cats[0] === 'UtilSkillGem') return 'Utility Gems'
   if (cats.includes('Weapon') || cats.includes('Fishing Rod')) return 'Weapons'
   if (cats.includes('Armour')) return 'Armour'
-  if (item.name.endsWith(' Support')) return 'Support Gems'
-  if (/flask/i.test(item.name)) return 'Flasks'
   return 'Other'
 }
 
-function ItemTag({ name, count, css, isGem }: { name: string; count: number; css: string; isGem?: boolean }) {
+function ItemTag({ name, count, css, isGem, levelReq }: { name: string; count: number; css: string; isGem?: boolean; levelReq?: number }) {
   const handlers = isGem ? {
     onMouseEnter: (e: React.MouseEvent) => showGemTooltip(e.nativeEvent, name),
     onMouseLeave: () => hideGemTooltip(),
@@ -56,6 +54,7 @@ function ItemTag({ name, count, css, isGem }: { name: string; count: number; css
       <img className="item-img" src={imgUrl(name)} alt=""
         onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
       {name}
+      {levelReq != null && <span className="item-level">L{levelReq}</span>}
       {count > 1 && <span className="item-count">×{count}</span>}
     </span>
   )
@@ -63,11 +62,28 @@ function ItemTag({ name, count, css, isGem }: { name: string; count: number; css
 
 const GEM_CATS = new Set(['Skill Gems', 'Support Gems', 'Utility Gems'])
 
-function CatSection({ cat, entries }: { cat: string; entries: [string, number][] }) {
+type GemSort = 'alpha' | 'level'
+
+function CatSection({ cat, entries, gemSort, gemLevelReq }: {
+  cat: string
+  entries: [string, number][]
+  gemSort?: GemSort
+  gemLevelReq?: Map<string, number>
+}) {
   const [collapsed, setCollapsed] = useState(false)
   const css   = CAT_CSS[cat] ?? ''
   const isGem = GEM_CATS.has(cat)
   const total = entries.reduce((s, [, c]) => s + c, 0)
+
+  // 999 sentinel pushes gems with no known reqLevel to the end.
+  const sorted = isGem && gemSort === 'level'
+    ? [...entries].sort((a, b) => {
+        const la = gemLevelReq?.get(a[0]) ?? 999
+        const lb = gemLevelReq?.get(b[0]) ?? 999
+        return la !== lb ? la - lb : a[0].localeCompare(b[0])
+      })
+    : entries
+
   return (
     <div className="cat-section">
       <div className={`cat-header ${collapsed ? 'collapsed' : ''}`} onClick={() => setCollapsed(v => !v)}>
@@ -77,8 +93,9 @@ function CatSection({ cat, entries }: { cat: string; entries: [string, number][]
       </div>
       {!collapsed && (
         <div className="cat-body">
-          {entries.map(([name, count]) => (
-            <ItemTag key={name} name={name} count={count} css={css} isGem={isGem} />
+          {sorted.map(([name, count]) => (
+            <ItemTag key={name} name={name} count={count} css={css} isGem={isGem}
+              levelReq={isGem && gemSort === 'level' ? gemLevelReq?.get(name) : undefined} />
           ))}
         </div>
       )}
@@ -300,6 +317,14 @@ function HintsSection({ hints }: { hints: APHint[] }) {
 export function ItemsScreen() {
   const { items, hints, char } = useStore()
   const [search, setSearch] = useState('')
+  const [gemSort, setGemSort] = useState<GemSort>('alpha')
+  // Built from store items (reqLevel enriched by main process) rather than a
+  // separate ap-assets fetch, so it's always in sync and never races with render.
+  const gemLevelReq = React.useMemo(() => {
+    const m = new Map<string, number>()
+    for (const item of items) if (item.reqLevel != null) m.set(item.name, item.reqLevel)
+    return m
+  }, [items])
   const searchRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -341,6 +366,7 @@ export function ItemsScreen() {
   const classItems = new Set(CLASS_TREE.flatMap(r => [r.base, ...r.asc]))
   const receivedNames = new Set(filteredItems.map(i => i.name))
   const hasClassItems = CLASS_TREE.some(r => receivedNames.has(r.base) || r.asc.some(a => receivedNames.has(a)))
+  const hasGemItems = filteredItems.some(i => GEM_CATS.has(categorizeItem(i)))
 
   const grouped: Record<string, Record<string, number>> = {}
   for (const cat of CAT_ORDER) grouped[cat] = {}
@@ -357,6 +383,16 @@ export function ItemsScreen() {
         <h1>Items</h1>
         <div className="sub">{items.length} received</div>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+          {hasGemItems && (
+            <div className="sort-bar" style={{ display: 'flex', alignItems: 'center', gap: 4, marginRight: 8 }}>
+              <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>Gems:</span>
+              {(['alpha', 'level'] as GemSort[]).map(s => (
+                <button key={s} className={`sort-btn${gemSort === s ? ' active' : ''}`} onClick={() => setGemSort(s)}>
+                  {s === 'alpha' ? 'A–Z' : 'Level'}
+                </button>
+              ))}
+            </div>
+          )}
           <input
             ref={searchRef}
             className="input mono"
@@ -409,7 +445,7 @@ export function ItemsScreen() {
         {CAT_ORDER.map(cat => {
           const entries = Object.entries(grouped[cat] ?? {}).sort((a, b) => a[0].localeCompare(b[0]))
           if (entries.length === 0) return null
-          return <CatSection key={cat} cat={cat} entries={entries} />
+          return <CatSection key={cat} cat={cat} entries={entries} gemSort={gemSort} gemLevelReq={gemLevelReq} />
         })}
 
         {/* Hints */}

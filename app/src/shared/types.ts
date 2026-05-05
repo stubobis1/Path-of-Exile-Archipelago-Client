@@ -127,12 +127,14 @@ export interface AlternateGem {
 }
 
 export interface ReceivedItem {
-  id:    number
-  name:  string
+  id:             number
+  name:           string
   classification: string
-  category: string[]
-  from:  string
-  index: number
+  category:       string[]
+  /** Populated by main-process enrichment from APItem; undefined for non-gem items. */
+  reqLevel?:      number
+  from:           string
+  index:          number
 }
 
 export interface ChatMessage {

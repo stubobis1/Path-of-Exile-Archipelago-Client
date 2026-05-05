@@ -21,6 +21,11 @@ export function clearFilters(): void {
 }
 
 let _locationNameToBase: Record<string, string> | null = null
+let _itemsReceivedSinceLastZone = false
+
+export function markNewItemReceived(): void {
+  _itemsReceivedSinceLastZone = true
+}
 
 export function locationNameToBase(): Record<string, string> {
   if (!_locationNameToBase) {
@@ -145,7 +150,10 @@ export async function handleZoneEntry(_zone: string): Promise<void> {
       apSocket.checkLocations([...toCheck])
       pushChat({ t: timestamp(), kind: 'sys', body: `Checked ${toCheck.size} new location(s)` })
     }
-    regenFilter()
+    if (_itemsReceivedSinceLastZone || toCheck.size > 0) {
+      regenFilter()
+    }
+    _itemsReceivedSinceLastZone = false
     queueChatSend('/itemfilter __ap')
   }
 }

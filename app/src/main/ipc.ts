@@ -13,7 +13,7 @@ import { getItems, getBosses, getBaseItems, getLevelLocations, getAreaLocations 
 import { logger } from './services/logger'
 import { checkGoalZone, checkBossDrops } from './validation'
 import { state, patch, pushChat, timestamp, sc, setSettingsContext, setGameOpts, setPendingGoalToken } from './ipc-state'
-import { regenFilter, handleZoneEntry, clearFilters } from './ipc-filter'
+import { regenFilter, handleZoneEntry, clearFilters, markNewItemReceived } from './ipc-filter'
 import { handleChatCommand } from './ipc-chat'
 import { handleAction } from './ipc-actions'
 
@@ -166,8 +166,10 @@ export function initIpc(): void {
     if (ev.type === 'item') {
       const item = ev.item
       const apItem = getItems().find(i => i.name === item.name)
+      // Enrich with static AP item data so the renderer doesn't need a separate fetch.
       item.classification = apItem?.classification ?? 'Filler'
-      item.category = apItem?.category ?? []
+      item.category       = apItem?.category ?? []
+      item.reqLevel       = apItem?.reqLevel
 
       // Dedup: archipelago.js replays all items from index 0 on reconnect.
       // Only whisper items with an index strictly above the high-water mark.
@@ -181,6 +183,7 @@ export function initIpc(): void {
       if (!alreadyHave) {
         state.items = [...state.items, item]
         patch({ items: state.items })
+        markNewItemReceived()
       }
 
       // Boss defeat: match received AP item ID against boss IDs (mirrors Python approach)

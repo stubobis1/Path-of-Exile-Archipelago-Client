@@ -211,12 +211,12 @@ function MonitoringCard() {
 function ItemsPanel({ onNavigate }: { onNavigate: (screen: string, section?: string) => void }) {
   const { items, char, goal, errors } = useStore()
 
-  const byCategory = (cat: string) => items.filter(i => i.category?.includes(cat)).length
+  const byCategory = (cat: string) => items.filter(i => i.category?.some(c => c.includes(cat))).length
   const gems         = byCategory('Gem')
   const armour       = byCategory('Armour')
   const weapons      = byCategory('Weapon')
   const flasks       = byCategory('Flask')
-  const passivePoints = items.filter(i => i.category?.includes('Passive')).length
+  const passivePoints = byCategory('Level')
   const allocatedPassives = (char?.passives as any)?.hashes?.length ?? null
 
   return (

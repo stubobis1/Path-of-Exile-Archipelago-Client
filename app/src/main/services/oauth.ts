@@ -66,7 +66,7 @@ export async function startOAuthFlow(): Promise<void> {
   const authUrl = `${AUTH_URL}?${params}`
 
   activeWin = new BrowserWindow({
-    width: 900, height: 700,
+    width: 900, height: 980,
     title: 'GGG Login',
     webPreferences: { nodeIntegration: false, contextIsolation: true },
   })

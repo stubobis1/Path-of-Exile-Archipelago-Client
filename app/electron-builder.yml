@@ -19,8 +19,10 @@ extraResources:
     to: images
 
 win:
-  target: nsis
-  icon: build/icon.ico
+  target:
+    - nsis
+    - portable
+  icon: resources/poeAP256.png
 
 linux:
   target: AppImage
@@ -29,3 +31,5 @@ linux:
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
+
+portable:
