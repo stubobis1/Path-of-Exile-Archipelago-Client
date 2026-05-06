@@ -51,6 +51,7 @@ function httpsGet(path: string, token: string): Promise<string> {
       res.on('data', c => (data += c))
       res.on('end', () => resolve(data))
     })
+    req.setTimeout(15_000, () => { req.destroy(new Error('GGG API request timed out')) })
     req.on('error', reject)
     req.end()
   })

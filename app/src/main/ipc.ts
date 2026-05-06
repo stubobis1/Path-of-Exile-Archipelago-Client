@@ -75,6 +75,18 @@ export function initIpc(): void {
     })
   }
 
+  // Refresh displayed token expiry every minute; demote to 'none' if token has since expired
+  setInterval(() => {
+    if (state.oauthStatus === 'valid') {
+      const left = tokenTimeLeft()
+      if (left === null) {
+        patch({ oauthStatus: 'none', oauthDaysLeft: null })
+      } else {
+        patch({ oauthDaysLeft: left })
+      }
+    }
+  }, 60_000)
+
   // Init from settings
   const s = settingsService.get()
   patch({

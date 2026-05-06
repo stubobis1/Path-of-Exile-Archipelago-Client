@@ -86,7 +86,7 @@ function StatusCard({ onNavigate }: { onNavigate: (screen: string, section?: str
   const { connection, serverAddr, char, charName, clientTxtPathOk, docPathOk, filterOk, clientTxtOk, oauthStatus, oauthDaysLeft, xdotoolOk } = useStore()
   const action = useStore(s => s.action)
   const connected = connection === 'connected'
-
+  const connecting = connection === 'connecting'
   const handleConnectAP = async () => {
     const s = await action({ type: 'getSettings' }) as any
     if (s?.serverAddress && s?.slotName) {
@@ -101,7 +101,7 @@ function StatusCard({ onNavigate }: { onNavigate: (screen: string, section?: str
     : charName
     ? `Character · ${charName}`
     : 'Character'
-  const apLabel = connected ? `AP Server · ${serverAddr}` : 'Disconnected from AP server'
+  const apLabel = connected ? `AP Server · ${serverAddr}` : connecting ? `Connecting · ${serverAddr}` : 'Disconnected from AP server'
   const gggLabel = oauthStatus === 'valid' && oauthDaysLeft ? `GGG API · ${oauthDaysLeft}` : 'GGG API'
 
   return (
@@ -141,8 +141,9 @@ function StatusCard({ onNavigate }: { onNavigate: (screen: string, section?: str
         
         <StatusRow
           ok={connected}
+          warn={connecting}
           label={apLabel}
-          cta={!connected
+          cta={!connected && !connecting
             ? <button className="btn sm" style={{ fontSize: 10, padding: '2px 8px' }} onClick={handleConnectAP}>Connect to AP</button>
             : undefined}
         />
