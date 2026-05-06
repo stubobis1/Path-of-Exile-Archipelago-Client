@@ -44,19 +44,19 @@ export function pushChat(msg: ChatMessage): void {
 
 export function timestamp(): string {
   const d = new Date()
-  return `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`
+  return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`
 }
 
 export function getFullState(): AppState {
   return state
 }
 
-// Per-world settings context — set on AP connect
+// Per-world settings context — set on AP connect, used to namespace per-slot settings
 let _settingsSeed = ''
 let _settingsUuid = ''
 let _settingsSlot = ''
 
-export function sc(): [string, string, string] {
+export function settingsCtx(): [string, string, string] {
   return [_settingsSeed, _settingsUuid, _settingsSlot]
 }
 
@@ -72,7 +72,16 @@ let _gameOpts: Record<string, any> = {}
 export function getGameOpts(): Record<string, any> { return _gameOpts }
 export function setGameOpts(opts: Record<string, any>): void { _gameOpts = opts }
 
-// Pending goal verification token (zone goals) — send token to char, wait for whisper back
+// Builds the ValidationCtx expected by validateCharEquipment / validatePassivePoints
+export function buildValidationCtx() {
+  return {
+    receivedItems:        state.items,
+    gucciMode:            (_gameOpts.gucciHobo ?? 0) as number,
+    passivePointsAsItems: _gameOpts.passivePointsAsItems !== false,
+  }
+}
+
+// Pending goal verification token (zone goals) — char whispers the token back to confirm identity
 let _pendingGoalToken: string | null = null
 
 export function getPendingGoalToken(): string | null { return _pendingGoalToken }

@@ -8,14 +8,14 @@ import * as path from 'path'
 import { getBaseItems, ensureJingles, ensureRandomSounds } from './data'
 import { logger } from './services/logger'
 import { validateCharEquipment, validatePassivePoints, toEquipArray } from './validation'
-import { state, patch, pushChat, timestamp, sc, getGameOpts } from './ipc-state'
+import { state, patch, pushChat, timestamp, settingsCtx, buildValidationCtx, getGameOpts } from './ipc-state'
 
 export function clearFilters(): void {
   const s = settingsService.get()
   if (!s.poeDocPath) return
   const content = s.baseItemFilter ? `Import "${s.baseItemFilter}" Optional\n` : ''
   try {
-    fs.writeFileSync(path.join(s.poeDocPath, '__ap.filter'), content, 'utf8')
+    fs.writeFileSync(path.join(s.poeDocPath, '__ap.filter'),      content, 'utf8')
     fs.writeFileSync(path.join(s.poeDocPath, '__invalid.filter'), content, 'utf8')
   } catch { /* ignore */ }
 }
@@ -27,6 +27,7 @@ export function markNewItemReceived(): void {
   _itemsReceivedSinceLastZone = true
 }
 
+// Lazy-built map from AP location name → PoE base item type
 export function locationNameToBase(): Record<string, string> {
   if (!_locationNameToBase) {
     _locationNameToBase = {}
@@ -38,7 +39,7 @@ export function locationNameToBase(): Record<string, string> {
 }
 
 export function regenFilter(): void {
-  const s = settingsService.get(...sc())
+  const s = settingsService.get(...settingsCtx())
   if (!s.poeDocPath) {
     pushChat({ t: timestamp(), kind: 'sys', body: 'Filter write failed: PoE documents path not set' })
     return
@@ -70,11 +71,11 @@ export function regenFilter(): void {
   }
 }
 
-export async function handleZoneEntry(_zone: string): Promise<void> {
-  const zoneDelay = settingsService.get(...sc()).inputDebounceZone ?? 0
-  if (zoneDelay > 0) await new Promise(r => setTimeout(r, zoneDelay))
+export async function handleZoneEntry(zone: string): Promise<void> {
+  const s = settingsService.get(...settingsCtx())
+  if (s.inputDebounceZone > 0) await new Promise(r => setTimeout(r, s.inputDebounceZone))
 
-  const charName = state.char?.name ?? settingsService.get(...sc()).lastCharName ?? settingsService.get().lastCharName
+  const charName = state.char?.name ?? s.lastCharName ?? settingsService.get().lastCharName
   if (!charName) {
     pushChat({ t: timestamp(), kind: 'sys', body: 'Zone entered — no character set. Type !ap char in game to identify.' })
     regenFilter()
@@ -95,19 +96,11 @@ export async function handleZoneEntry(_zone: string): Promise<void> {
 
   patch({ char: gggChar as any })
 
-  const gameOpts = getGameOpts()
-  const ctx = {
-    receivedItems:        state.items,
-    gucciMode:            gameOpts.gucciHobo            ?? 0,
-    passivePointsAsItems: gameOpts.passivePointsAsItems !== false,
-  }
-
-  const errs = [
-    ...validateCharEquipment(gggChar, ctx),
-    ...validatePassivePoints(gggChar, ctx),
-  ]
+  const ctx  = buildValidationCtx()
+  const errs = [...validateCharEquipment(gggChar, ctx), ...validatePassivePoints(gggChar, ctx)]
   patch({ errors: errs })
 
+  const gameOpts         = getGameOpts()
   const missingWithNames = apSocket.getMissingLocationsWithNames()
   const missingSet       = new Set(missingWithNames.map(l => l.id))
   const locNameToBase    = locationNameToBase()
@@ -128,6 +121,7 @@ export async function handleZoneEntry(_zone: string): Promise<void> {
     if (locId !== undefined && missingSet.has(locId)) toCheck.add(locId)
   }
 
+  // Level-up locations
   if (gameOpts.LevelingUpAsLocations !== false && gggChar.level) {
     for (let level = 2; level <= gggChar.level; level++) {
       const loc = missingWithNames.find(l => l.name === `Reach Level ${level}`)
@@ -135,8 +129,9 @@ export async function handleZoneEntry(_zone: string): Promise<void> {
     }
   }
 
-  if (gameOpts.areaLocationsAsLocations !== false && _zone) {
-    const loc = missingWithNames.find(l => l.name === `Reach ${_zone}`)
+  // Area arrival location
+  if (gameOpts.areaLocationsAsLocations !== false && zone) {
+    const loc = missingWithNames.find(l => l.name === `Reach ${zone}`)
     if (loc) toCheck.add(loc.id)
   }
 

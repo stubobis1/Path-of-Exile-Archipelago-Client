@@ -2,9 +2,11 @@ import { settingsService } from './services/settings'
 import { getCachedCharacter } from './services/gggApi'
 import { openChatAndSend, queueChatSend } from './services/gameInput'
 import { getItems } from './data'
-import { state, patch, pushChat, timestamp, sc, getPendingGoalToken, setPendingGoalToken } from './ipc-state'
+import { state, patch, pushChat, timestamp, settingsCtx, getPendingGoalToken, setPendingGoalToken } from './ipc-state'
 
 let _pendingCharToken: string | null = null
+
+// --- Item query helpers ---
 
 function receivedIds(): Set<number> {
   return new Set(state.items.map(i => i.id))
@@ -50,6 +52,14 @@ function gearMessage(filterCat: string): string {
   return parts.length ? parts.join(', ') : 'none'
 }
 
+function countedList(items: ReturnType<typeof receivedOfCategory>, empty: string): string {
+  const counts: Record<string, number> = {}
+  for (const i of items) counts[i.name] = (counts[i.name] ?? 0) + 1
+  return Object.keys(counts).length
+    ? Object.entries(counts).map(([k, v]) => `${k}: ${v}`).join(', ')
+    : empty
+}
+
 function bossMessage(): string {
   const g = state.goal
   if (!g || g.type !== 10 || !g.bosses?.length) return 'No boss goal active'
@@ -61,16 +71,16 @@ function goalMessage(): string {
   const g = state.goal
   if (!g) return 'No goal set'
   const GOAL_NAMES: Record<number, string> = {
-    0: 'Complete the campaign (reach Karui Shores)',
-    1: 'Complete Act 1 (reach The Southern Forest)',
-    2: 'Complete Act 2 (reach The City of Sarn)',
-    3: 'Complete Act 3 (reach The Aqueduct)',
-    4: 'Complete Act 4 (reach The Slave Pens)',
-    5: 'Reach Karui Fortress (Act 5/6)',
-    6: 'Complete Act 6 (reach The Bridge Encampment)',
-    7: 'Complete Act 7 (reach The Sarn Ramparts)',
-    8: 'Complete Act 8 (reach The Blood Aqueduct)',
-    9: 'Complete Act 9 (reach Oriath Docks)',
+    0:  'Complete the campaign (reach Karui Shores)',
+    1:  'Complete Act 1 (reach The Southern Forest)',
+    2:  'Complete Act 2 (reach The City of Sarn)',
+    3:  'Complete Act 3 (reach The Aqueduct)',
+    4:  'Complete Act 4 (reach The Slave Pens)',
+    5:  'Reach Karui Fortress (Act 5/6)',
+    6:  'Complete Act 6 (reach The Bridge Encampment)',
+    7:  'Complete Act 7 (reach The Sarn Ramparts)',
+    8:  'Complete Act 8 (reach The Blood Aqueduct)',
+    9:  'Complete Act 9 (reach Oriath Docks)',
     10: 'Defeat bosses',
   }
   const name = GOAL_NAMES[g.type] ?? `Goal type ${g.type}`
@@ -81,6 +91,8 @@ function goalMessage(): string {
   return `${name} - ${g.complete ? 'complete!' : 'in progress'}`
 }
 
+// --- Game chat output ---
+
 async function sendGameChat(resp: string): Promise<void> {
   const prefix = `@${state.char?.name ?? state.slotName} `
   const MAX    = 500 - prefix.length
@@ -89,10 +101,131 @@ async function sendGameChat(resp: string): Promise<void> {
   }
 }
 
+// --- Command dispatch ---
+
+// Maps alternate spellings to the canonical command key used in dispatchCommand
+const ALIASES: Record<string, string> = {
+  '!commands':       '!help',
+  '!cmds':           '!help',
+  '!armor':          '!armour',
+  '!flask':          '!flasks',
+  '!all gems':       '!gems',
+  '!p':              '!passives',
+  '!passive':        '!passives',
+  '!whisper update': '!whisper updates',
+  '!updates':        '!whisper updates',
+  '!update':         '!whisper updates',
+  '!ascendancies':   '!ascendancy',
+  '!classes':        '!ascendancy',
+  '!class':          '!ascendancy',
+  '!bosses':         '!boss',
+}
+
+function dispatchCommand(cmd: string): string | null {
+  const key       = ALIASES[cmd] ?? cmd
+  const charLevel = state.char?.level
+
+  switch (key) {
+    case '!help':
+      return '!gear !weapons !armor !links !flasks !gems !main gems !support gems !utility gems !usable gems !ascendancy !passives !deathlink !whisper updates !goal !boss !help'
+
+    case '!gear':    return `Gear: ${gearMessage('Gear')}`
+    case '!weapons': return `Weapons: ${gearMessage('Weapon')}`
+    case '!armour':  return `Armour: ${gearMessage('Armour')}`
+
+    case '!links':
+      return countedList(receivedOfCategory('max links'), 'No link items')
+
+    case '!flasks':
+      return countedList(receivedOfCategory('Flask'), 'No flask items')
+
+    case '!gems': {
+      const gems = [
+        ...gemsOfCategory('MainSkillGem'),
+        ...gemsOfCategory('SupportGem'),
+        ...gemsOfCategory('UtilSkillGem'),
+        ...receivedOfCategory('GemModifier'),
+      ]
+      return gems.length ? gems.map(g => g.name).join(', ') : 'No gems'
+    }
+
+    case '!main gems': {
+      const gems = gemsOfCategory('MainSkillGem')
+      return gems.length ? gems.map(g => g.name).join(', ') : 'No skill gems'
+    }
+
+    case '!support gems': {
+      const gems = gemsOfCategory('SupportGem')
+      return gems.length ? gems.map(g => g.name).join(', ') : 'No support gems'
+    }
+
+    case '!utility gems': {
+      const gems = gemsOfCategory('UtilSkillGem')
+      return gems.length ? gems.map(g => g.name).join(', ') : 'No utility gems'
+    }
+
+    case '!usable gems': {
+      const gems = [
+        ...gemsOfCategory('MainSkillGem', charLevel),
+        ...gemsOfCategory('SupportGem',   charLevel),
+        ...gemsOfCategory('UtilSkillGem', charLevel),
+      ].sort((a, b) => (b.reqLevel ?? 0) - (a.reqLevel ?? 0))
+      return gems.length ? gems.map(g => `${g.name}(${g.reqLevel ?? 0})`).join(', ') : 'No usable gems'
+    }
+
+    case '!usable skill gems': {
+      const gems = gemsOfCategory('MainSkillGem', charLevel).reverse()
+      return gems.length ? gems.map(g => `${g.name}(${g.reqLevel ?? 0})`).join(', ') : 'No usable skill gems'
+    }
+
+    case '!usable support gems': {
+      const gems = gemsOfCategory('SupportGem', charLevel).reverse()
+      return gems.length ? gems.map(g => `${g.name}(${g.reqLevel ?? 0})`).join(', ') : 'No usable support gems'
+    }
+
+    case '!usable utility gems': {
+      const gems = gemsOfCategory('UtilSkillGem', charLevel).reverse()
+      return gems.length ? gems.map(g => `${g.name}(${g.reqLevel ?? 0})`).join(', ') : 'No usable utility gems'
+    }
+
+    case '!ascendancy': {
+      const items = receivedOfCategory('Ascendancy')
+      return items.length ? items.map(i => i.name).join(', ') : 'No ascendancy items'
+    }
+
+    case '!passives': {
+      const received  = state.items.filter(i => i.name === 'Progressive passive point').length
+      const allocated = (state.char?.passives as any)?.hashes?.length ?? 0
+      return `${received - allocated} passive points available (${allocated}/${received} used for ${state.char?.name ?? '?'})`
+    }
+
+    case '!deathlink': {
+      const newVal = !state.deathlink
+      patch({ deathlink: newVal })
+      settingsService.set('deathlink', newVal, ...settingsCtx())
+      return `DeathLink ${newVal ? 'enabled' : 'disabled'}`
+    }
+
+    case '!whisper updates': {
+      const newVal = !state.whisperUpdates
+      patch({ whisperUpdates: newVal })
+      settingsService.set('whisperUpdates', newVal, ...settingsCtx())
+      return `Whisper updates ${newVal ? 'enabled' : 'disabled'}`
+    }
+
+    case '!goal': return goalMessage()
+    case '!boss': return bossMessage()
+
+    default: return null
+  }
+}
+
+// --- Main entry point ---
+
 export async function handleChatCommand(who: string, msg: string): Promise<void> {
   const trimmed = msg.trim()
 
-  // Goal zone verification token — char whispers back the token to confirm in-game identity
+  // Zone goal verification: char whispers back the token to confirm in-game identity
   const goalToken = getPendingGoalToken()
   if (goalToken && trimmed.includes(goalToken) && who === (state.char?.name ?? state.slotName)) {
     setPendingGoalToken(null)
@@ -103,10 +236,10 @@ export async function handleChatCommand(who: string, msg: string): Promise<void>
     return
   }
 
-  // Token response from self-whisper char identification — check before owner filter
+  // Self-whisper char identification token — must be checked before the owner guard
   if (_pendingCharToken && trimmed === `char_${_pendingCharToken}`) {
     _pendingCharToken = null
-    settingsService.set('lastCharName', who, ...sc())
+    settingsService.set('lastCharName', who, ...settingsCtx())
     settingsService.set('lastCharName', who)
     patch({ charName: who })
     const gggChar = await getCachedCharacter(who, true)
@@ -115,9 +248,9 @@ export async function handleChatCommand(who: string, msg: string): Promise<void>
     return
   }
 
-  // !ap char — must be before the owner guard so it works before character is identified
-  const cmd0 = trimmed.toLowerCase()
-  if (['!ap char', '!ap character', '!apchar', '!ap setchar', '!ap setcharacter', '!ap_char'].includes(cmd0)) {
+  // !ap char — triggers self-whisper identification; must be before the owner guard
+  const cmd = trimmed.toLowerCase()
+  if (['!ap char', '!ap character', '!apchar', '!ap setchar', '!ap setcharacter', '!ap_char'].includes(cmd)) {
     const token = Math.random().toString(36).slice(2, 10)
     _pendingCharToken = token
     queueChatSend(`char_${token}`)
@@ -125,94 +258,11 @@ export async function handleChatCommand(who: string, msg: string): Promise<void>
     return
   }
 
-  // Only respond to our own character's messages.
-  // Fall back to charName when char object is absent (no OAuth / API offline).
+  // Only respond to the identified character (or slot name when no char object yet)
   const knownChar = state.char?.name ?? state.charName ?? null
   if (!knownChar || (who !== knownChar && who !== state.slotName)) return
 
-  const cmd = trimmed.toLowerCase()
-  const charLevel = state.char?.level
-
-  let resp: string | null = null
-
-  if (['!help', '!commands', '!cmds'].includes(cmd)) {
-    resp = '!gear !weapons !armor !links !flasks !gems !main gems !support gems !utility gems !usable gems !ascendancy !passives !deathlink !whisper updates !goal !boss !help'
-  } else if (cmd === '!gear') {
-    resp = `Gear: ${gearMessage('Gear')}`
-  } else if (cmd === '!weapons') {
-    resp = `Weapons: ${gearMessage('Weapon')}`
-  } else if (['!armor', '!armour'].includes(cmd)) {
-    resp = `Armour: ${gearMessage('Armour')}`
-  } else if (cmd === '!links') {
-    const links = receivedOfCategory('max links')
-    const counts: Record<string, number> = {}
-    for (const i of links) counts[i.name] = (counts[i.name] ?? 0) + 1
-    resp = Object.keys(counts).length
-      ? Object.entries(counts).map(([k, v]) => `${k}: ${v}`).join(', ')
-      : 'No link items'
-  } else if (['!flasks', '!flask'].includes(cmd)) {
-    const flasks = receivedOfCategory('Flask')
-    const counts: Record<string, number> = {}
-    for (const i of flasks) counts[i.name] = (counts[i.name] ?? 0) + 1
-    resp = Object.keys(counts).length
-      ? Object.entries(counts).map(([k, v]) => `${k}: ${v}`).join(', ')
-      : 'No flask items'
-  } else if (['!gems', '!all gems'].includes(cmd)) {
-    const gems = [
-      ...gemsOfCategory('MainSkillGem'),
-      ...gemsOfCategory('SupportGem'),
-      ...gemsOfCategory('UtilSkillGem'),
-      ...receivedOfCategory('GemModifier'),
-    ]
-    resp = gems.length ? gems.map(g => g.name).join(', ') : 'No gems'
-  } else if (cmd === '!main gems') {
-    const gems = gemsOfCategory('MainSkillGem')
-    resp = gems.length ? gems.map(g => g.name).join(', ') : 'No skill gems'
-  } else if (cmd === '!support gems') {
-    const gems = gemsOfCategory('SupportGem')
-    resp = gems.length ? gems.map(g => g.name).join(', ') : 'No support gems'
-  } else if (cmd === '!utility gems') {
-    const gems = gemsOfCategory('UtilSkillGem')
-    resp = gems.length ? gems.map(g => g.name).join(', ') : 'No utility gems'
-  } else if (cmd === '!usable gems') {
-    const gems = [
-      ...gemsOfCategory('MainSkillGem', charLevel),
-      ...gemsOfCategory('SupportGem',   charLevel),
-      ...gemsOfCategory('UtilSkillGem', charLevel),
-    ].sort((a, b) => (b.reqLevel ?? 0) - (a.reqLevel ?? 0))
-    resp = gems.length ? gems.map(g => `${g.name}(${g.reqLevel ?? 0})`).join(', ') : 'No usable gems'
-  } else if (cmd === '!usable skill gems') {
-    const gems = gemsOfCategory('MainSkillGem', charLevel).reverse()
-    resp = gems.length ? gems.map(g => `${g.name}(${g.reqLevel ?? 0})`).join(', ') : 'No usable skill gems'
-  } else if (cmd === '!usable support gems') {
-    const gems = gemsOfCategory('SupportGem', charLevel).reverse()
-    resp = gems.length ? gems.map(g => `${g.name}(${g.reqLevel ?? 0})`).join(', ') : 'No usable support gems'
-  } else if (cmd === '!usable utility gems') {
-    const gems = gemsOfCategory('UtilSkillGem', charLevel).reverse()
-    resp = gems.length ? gems.map(g => `${g.name}(${g.reqLevel ?? 0})`).join(', ') : 'No usable utility gems'
-  } else if (['!ascendancy', '!ascendancies', '!classes', '!class'].includes(cmd)) {
-    const items = receivedOfCategory('Ascendancy')
-    resp = items.length ? items.map(i => i.name).join(', ') : 'No ascendancy items'
-  } else if (['!p', '!passive', '!passives'].includes(cmd)) {
-    const received  = state.items.filter(i => i.name === 'Progressive passive point').length
-    const allocated = (state.char?.passives as any)?.hashes?.length ?? 0
-    resp = `${received - allocated} passive points available (${allocated}/${received} used for ${state.char?.name ?? '?'})`
-  } else if (cmd === '!deathlink') {
-    const newVal = !state.deathlink
-    patch({ deathlink: newVal })
-    settingsService.set('deathlink', newVal, ...sc())
-    resp = `DeathLink ${newVal ? 'enabled' : 'disabled'}`
-  } else if (['!whisper updates', '!whisper update', '!updates', '!update'].includes(cmd)) {
-    const newVal = !state.whisperUpdates
-    patch({ whisperUpdates: newVal })
-    settingsService.set('whisperUpdates', newVal, ...sc())
-    resp = `Whisper updates ${newVal ? 'enabled' : 'disabled'}`
-  } else if (cmd === '!goal') {
-    resp = goalMessage()
-  } else if (['!boss', '!bosses'].includes(cmd)) {
-    resp = bossMessage()
-  }
-
+  const resp = dispatchCommand(cmd)
   if (resp) {
     pushChat({ t: timestamp(), kind: 'self', body: resp })
     await sendGameChat(resp)

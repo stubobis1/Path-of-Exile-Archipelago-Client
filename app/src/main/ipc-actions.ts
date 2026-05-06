@@ -11,9 +11,36 @@ import { openChatAndSend, queueChatSend, checkXdotool } from './services/gameInp
 import { apSocket } from './services/apSocket'
 import { logger } from './services/logger'
 import { validateCharEquipment, validatePassivePoints } from './validation'
-import { state, patch, pushChat, timestamp, sc, getGameOpts } from './ipc-state'
+import { state, patch, pushChat, timestamp, settingsCtx, buildValidationCtx } from './ipc-state'
 import { regenFilter } from './ipc-filter'
 import { findClientTxt, findDocPath } from './ipc-paths'
+
+// Runs full validation against the GGG API and applies the appropriate filter.
+// Returns false when the character could not be fetched.
+async function validateAndApplyFilter(charName: string, opts: { pushErrToChat?: boolean } = {}): Promise<boolean> {
+  clearCharCache()
+  const gggChar = await getCachedCharacter(charName, true)
+  if (!gggChar) return false
+
+  patch({ char: gggChar as any, charName: gggChar.name })
+
+  const ctx  = buildValidationCtx()
+  const errs = [...validateCharEquipment(gggChar, ctx), ...validatePassivePoints(gggChar, ctx)]
+  patch({ errors: errs })
+
+  if (errs.length > 0) {
+    const errorText = errs.map(e => e.msg).join(', and ')
+    if (opts.pushErrToChat) {
+      pushChat({ t: timestamp(), kind: 'err', body: `Out of logic: ${errorText}` })
+    }
+    queueChatSend('/itemfilter __invalid')
+    queueChatSend(`@${gggChar.name} Invalid state: ${errorText}`)
+  } else {
+    regenFilter()
+    queueChatSend('/itemfilter __ap')
+  }
+  return true
+}
 
 export async function handleAction(action: IpcAction): Promise<unknown> {
   switch (action.type) {
@@ -21,7 +48,7 @@ export async function handleAction(action: IpcAction): Promise<unknown> {
     case 'connect': {
       patch({ connection: 'connecting', serverAddr: action.addr, slotName: action.slot })
       settingsService.setMany({ serverAddress: action.addr, slotName: action.slot, password: action.password })
-      settingsService.setMany({ serverAddress: action.addr, slotName: action.slot, password: action.password }, ...sc())
+      settingsService.setMany({ serverAddress: action.addr, slotName: action.slot, password: action.password }, ...settingsCtx())
       try {
         await apSocket.connect(action.addr, action.slot, action.password, state.deathlink)
       } catch (e: any) {
@@ -40,10 +67,7 @@ export async function handleAction(action: IpcAction): Promise<unknown> {
     case 'oauth:start': {
       try {
         await startOAuthFlow()
-        patch({
-          oauthStatus:   'valid',
-          oauthDaysLeft: tokenTimeLeft(),
-        })
+        patch({ oauthStatus: 'valid', oauthDaysLeft: tokenTimeLeft() })
         pushChat({ t: timestamp(), kind: 'sys', body: 'GGG OAuth complete' })
         // Retry character fetch now that we have a valid token
         const charName = state.char?.name ?? settingsService.get().lastCharName
@@ -66,29 +90,7 @@ export async function handleAction(action: IpcAction): Promise<unknown> {
     case 'revalidate': {
       const charName = state.char?.name ?? settingsService.get().lastCharName
       if (!charName) return null
-      clearCharCache()
-      const gggChar = await getCachedCharacter(charName, true)
-      if (gggChar) {
-        const gameOpts = getGameOpts()
-        const ctx = {
-          receivedItems:        state.items,
-          gucciMode:            gameOpts.gucciHobo            ?? 0,
-          passivePointsAsItems: gameOpts.passivePointsAsItems !== false,
-        }
-        const errs = [
-          ...validateCharEquipment(gggChar, ctx),
-          ...validatePassivePoints(gggChar, ctx),
-        ]
-        patch({ errors: errs })
-        if (errs.length > 0) {
-          const errorText = errs.map(e => e.msg).join(', and ')
-          queueChatSend('/itemfilter __invalid')
-          queueChatSend(`@${charName} Invalid state: ${errorText}`)
-        } else {
-          regenFilter()
-          queueChatSend('/itemfilter __ap')
-        }
-      }
+      await validateAndApplyFilter(charName)
       return null
     }
 
@@ -110,19 +112,19 @@ export async function handleAction(action: IpcAction): Promise<unknown> {
 
     case 'setDeathlink': {
       patch({ deathlink: action.enabled })
-      settingsService.set('deathlink', action.enabled, ...sc())
+      settingsService.set('deathlink', action.enabled, ...settingsCtx())
       apSocket.setDeathlinkTag(action.enabled)
       return null
     }
 
     case 'setWhisperUpdates': {
       patch({ whisperUpdates: action.enabled })
-      settingsService.set('whisperUpdates', action.enabled, ...sc())
+      settingsService.set('whisperUpdates', action.enabled, ...settingsCtx())
       return null
     }
 
     case 'saveSetting': {
-      settingsService.set(action.key, action.value as never, ...sc())
+      settingsService.set(action.key, action.value as never, ...settingsCtx())
       // Infra keys are global — also write to default so per-world stores stay in sync
       const GLOBAL_KEYS = new Set(['clientTxtPath', 'poeDocPath', 'baseItemFilter'])
       if (GLOBAL_KEYS.has(action.key)) settingsService.set(action.key, action.value as never)
@@ -142,13 +144,11 @@ export async function handleAction(action: IpcAction): Promise<unknown> {
     }
 
     case 'handshakeChar': {
-      settingsService.set('lastCharName', action.charName, ...sc())
+      settingsService.set('lastCharName', action.charName, ...settingsCtx())
       settingsService.set('lastCharName', action.charName)
       patch({ charName: action.charName })
       const gggChar = await getCachedCharacter(action.charName, true)
-      if (gggChar) {
-        patch({ char: gggChar as any, charName: gggChar.name })
-      }
+      if (gggChar) patch({ char: gggChar as any, charName: gggChar.name })
       return null
     }
 
@@ -159,42 +159,20 @@ export async function handleAction(action: IpcAction): Promise<unknown> {
     }
 
     case 'startMonitoring': {
-      const s = settingsService.get(...sc())
+      const s = settingsService.get(...settingsCtx())
       const watchOk = s.clientTxtPath ? clientTxtWatcher.start(s.clientTxtPath) : false
       patch({ clientTxtOk: watchOk })
       regenFilter()
       pushChat({ t: timestamp(), kind: 'sys', body: 'Switch to Path of Exile — validating character before loading filter' })
+
       const charName = state.char?.name ?? settingsService.get().lastCharName
       if (charName) {
-        clearCharCache()
-        const gggChar = await getCachedCharacter(charName, true)
-        if (gggChar) {
-          patch({ char: gggChar as any, charName: gggChar.name })
-          const gameOpts = getGameOpts()
-          const ctx = {
-            receivedItems:        state.items,
-            gucciMode:            gameOpts.gucciHobo            ?? 0,
-            passivePointsAsItems: gameOpts.passivePointsAsItems !== false,
-          }
-          const errs = [
-            ...validateCharEquipment(gggChar, ctx),
-            ...validatePassivePoints(gggChar, ctx),
-          ]
-          patch({ errors: errs })
-          if (errs.length > 0) {
-            const errorText = errs.map(e => e.msg).join(', and ')
-            pushChat({ t: timestamp(), kind: 'err', body: `Out of logic: ${errorText}` })
-            queueChatSend('/itemfilter __invalid')
-            queueChatSend(`@${gggChar.name} Invalid state: ${errorText}`)
-          } else {
-            queueChatSend('/itemfilter __ap')
-          }
-        } else {
-          queueChatSend('/itemfilter __ap')
-        }
+        const fetched = await validateAndApplyFilter(charName, { pushErrToChat: true })
+        if (!fetched) queueChatSend('/itemfilter __ap')
       } else {
         queueChatSend('/itemfilter __ap')
       }
+
       pushChat({ t: timestamp(), kind: 'sys', body: 'Monitoring started — filter loaded, gear validated' })
       return null
     }
@@ -246,7 +224,7 @@ export async function handleAction(action: IpcAction): Promise<unknown> {
     }
 
     case 'getSettings': {
-      return settingsService.get(...sc())
+      return settingsService.get(...settingsCtx())
     }
 
     case 'hintItem': {
@@ -290,8 +268,7 @@ export async function handleAction(action: IpcAction): Promise<unknown> {
       const userData = app.getPath('userData')
       try {
         for (const f of fs.readdirSync(userData)) {
-          const fp = path.join(userData, f)
-          fs.rmSync(fp, { recursive: true, force: true })
+          fs.rmSync(path.join(userData, f), { recursive: true, force: true })
         }
         settingsService.setMany({
           clientTxtPath: '', poeDocPath: '', baseItemFilter: '',
