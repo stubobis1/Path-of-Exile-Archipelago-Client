@@ -1,8 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react'
+import { imgOnError } from '../imgError'
 import { useStore } from '../store'
-import type { ReceivedItem, APHint } from '@shared/types'
-import { initGemTooltips, preloadGems, showGemTooltip, hideGemTooltip, moveGemTooltip } from '../services/gemTooltip'
+import type { ReceivedItem, APHint, APLocation } from '@shared/types'
+import { initGemTooltips, preloadGems, showGemTooltip, hideGemTooltip, moveGemTooltip, getGemTags } from '../services/gemTooltip'
 import { PaperDoll } from '../components/PaperDoll'
+import { HintedItems } from '../components/HintedItems'
 
 const CLASS_TREE = [
   { base: 'Marauder', asc: ['Berserker', 'Chieftain', 'Juggernaut'] },
@@ -29,18 +31,50 @@ function imgUrl(name: string) {
   return `ap-assets:///images/${name.toLowerCase().replace(/['\s]/g, '')}.png`
 }
 
+const GEM_MODIFIERS = ['Vaal Gems', 'Alternate Gems']
+
 function categorizeItem(item: ReceivedItem): string {
   const cats = item.category ?? []
   if (cats.includes('Level') || cats.includes('max links')) return 'Progression'
   if (cats[0] === 'Flask') return 'Flasks'
   if (cats.includes('Base Class')) return 'Classes'
   if (cats.includes('Ascendancy')) return 'Ascendancies'
+  if (cats[0] === 'GemModifier') return 'GemModifiers'
   if (cats[0] === 'MainSkillGem') return 'Skill Gems'
   if (cats[0] === 'SupportGem') return 'Support Gems'
   if (cats[0] === 'UtilSkillGem') return 'Utility Gems'
   if (cats.includes('Weapon') || cats.includes('Fishing Rod')) return 'Weapons'
   if (cats.includes('Armour')) return 'Armour'
   return 'Other'
+}
+
+function GemModifiersSection({ receivedNames }: { receivedNames: Set<string> }) {
+  return (
+    <div className="cat-section">
+      <div className="cat-header" style={{ pointerEvents: 'none' }}>
+        <h3>Gem Modifiers</h3>
+      </div>
+      <div className="cat-body" style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        {GEM_MODIFIERS.map(name => {
+          const has = receivedNames.has(name)
+          return (
+            <span key={name} className="item-tag gem" style={{
+              opacity: has ? 1 : 0.35,
+              filter: has ? undefined : 'grayscale(1)',
+              cursor: 'default',
+            }}>
+              <img className="item-img" src={imgUrl(name)} alt=""
+                onError={imgOnError} />
+              {name}
+            </span>
+          )
+        })}
+        <div className="mono" style={{ width: '100%', fontSize: 10.5, marginTop: 4, color: 'var(--ink-4)' }}>
+          "of Trarthus" gems require the Alternate Gems unlock and the base gem.
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function ItemTag({ name, count, css, isGem, levelReq }: { name: string; count: number; css: string; isGem?: boolean; levelReq?: number }) {
@@ -52,7 +86,7 @@ function ItemTag({ name, count, css, isGem, levelReq }: { name: string; count: n
   return (
     <span className={`item-tag ${css}`} style={isGem ? { cursor: 'default' } : undefined} {...handlers}>
       <img className="item-img" src={imgUrl(name)} alt=""
-        onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+        onError={imgOnError} />
       {name}
       {levelReq != null && <span className="item-level">L{levelReq}</span>}
       {count > 1 && <span className="item-count">×{count}</span>}
@@ -103,11 +137,12 @@ function CatSection({ cat, entries, gemSort, gemLevelReq }: {
   )
 }
 
-function ClassSection({ receivedNames }: { receivedNames: Set<string> }) {
+function ClassSection({ receivedNames, searchMatchNames }: { receivedNames: Set<string>; searchMatchNames?: Set<string> | null }) {
   const [collapsed, setCollapsed] = useState(false)
   const allAsc = CLASS_TREE.flatMap(r => r.asc)
   const got    = CLASS_TREE.filter(r => receivedNames.has(r.base)).length + allAsc.filter(a => receivedNames.has(a)).length
   const total  = CLASS_TREE.length + allAsc.length
+  const matchCls = (name: string) => searchMatchNames != null && searchMatchNames.has(name) && receivedNames.has(name) ? ' search-match' : ''
   return (
     <div className="cat-section">
       <div className={`class-section-header ${collapsed ? 'collapsed' : ''}`} onClick={() => setCollapsed(v => !v)}>
@@ -121,13 +156,13 @@ function ClassSection({ receivedNames }: { receivedNames: Set<string> }) {
             <div className="class-col" key={gi}>
               {group.map(({ base, asc }) => (
                 <div className="class-row" key={base}>
-                  <div className={`class-card base ${receivedNames.has(base) ? 'received' : ''}`}>
-                    <img src={imgUrl(base)} alt="" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                  <div className={`class-card base ${receivedNames.has(base) ? 'received' : ''}${matchCls(base)}`}>
+                    <img src={imgUrl(base)} alt="" onError={imgOnError} />
                     <span>{base}</span>
                   </div>
                   {asc.map(a => (
-                    <div key={a} className={`class-card asc ${receivedNames.has(a) ? 'received' : ''}`}>
-                      <img src={imgUrl(a)} alt="" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                    <div key={a} className={`class-card asc ${receivedNames.has(a) ? 'received' : ''}${matchCls(a)}`}>
+                      <img src={imgUrl(a)} alt="" onError={imgOnError} />
                       <span>{a}</span>
                     </div>
                   ))}
@@ -141,181 +176,18 @@ function ClassSection({ receivedNames }: { receivedNames: Set<string> }) {
   )
 }
 
-function HintComboBox({ value, onChange, items: names }: { value: string; onChange: (v: string) => void; items: string[] }) {
-  const [open, setOpen] = useState(false)
-  const [activeIdx, setActiveIdx] = useState(-1)
-  const wrapRef = useRef<HTMLDivElement>(null)
-  const listRef = useRef<HTMLUListElement>(null)
 
-  const filtered = value.trim()
-    ? names.filter(n => n.toLowerCase().includes(value.toLowerCase()))
-    : names
-
-  useEffect(() => {
-    setActiveIdx(-1)
-  }, [value])
-
-  useEffect(() => {
-    if (!open) return
-    function onDown(e: MouseEvent) {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', onDown)
-    return () => document.removeEventListener('mousedown', onDown)
-  }, [open])
-
-  function select(name: string) {
-    onChange(name)
-    setOpen(false)
-  }
-
-  function onKey(e: React.KeyboardEvent) {
-    if (!open && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) { setOpen(true); return }
-    if (!open) return
-    if (e.key === 'ArrowDown') {
-      e.preventDefault()
-      const next = Math.min(activeIdx + 1, filtered.length - 1)
-      setActiveIdx(next)
-      listRef.current?.children[next]?.scrollIntoView({ block: 'nearest' })
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault()
-      const prev = Math.max(activeIdx - 1, 0)
-      setActiveIdx(prev)
-      listRef.current?.children[prev]?.scrollIntoView({ block: 'nearest' })
-    } else if (e.key === 'Enter') {
-      if (activeIdx >= 0 && filtered[activeIdx]) select(filtered[activeIdx])
-    } else if (e.key === 'Escape') {
-      setOpen(false)
-    }
-  }
-
-  return (
-    <div ref={wrapRef} style={{ position: 'relative', flex: 1 }}>
-      <input
-        className="input mono" style={{ width: '100%', fontSize: 12, boxSizing: 'border-box' }}
-        placeholder="Item name to hint…"
-        value={value}
-        onChange={e => { onChange(e.target.value); setOpen(true) }}
-        onFocus={() => setOpen(true)}
-        onKeyDown={onKey}
-      />
-      {open && filtered.length > 0 && (
-        <ul ref={listRef} style={{
-          position: 'absolute', bottom: '100%', left: 0, right: 0, zIndex: 100,
-          margin: 0, padding: '4px 0', listStyle: 'none',
-          background: 'var(--bg-3)', border: '1px solid var(--rule-2)',
-          borderRadius: 5, maxHeight: 280, overflowY: 'auto',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
-        }}>
-          {filtered.map((n, i) => (
-            <li key={n}
-              onMouseDown={() => select(n)}
-              onMouseEnter={() => setActiveIdx(i)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                padding: '5px 10px', cursor: 'default', fontSize: 12,
-                background: i === activeIdx ? 'var(--accent-soft)' : 'transparent',
-                color: i === activeIdx ? 'var(--ink)' : 'var(--ink-2)',
-              }}>
-              <img src={imgUrl(n)} alt="" style={{ width: 22, height: 22, objectFit: 'contain', flexShrink: 0 }}
-                onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
-              <span className="mono">{n}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  )
-}
-
-function useAllItemNames(receivedItems: ReceivedItem[]): string[] {
-  const [allItems, setAllItems] = useState<{ name: string; count?: number }[]>([])
-
-  useEffect(() => {
-    fetch('ap-assets:///data/Items.json')
-      .then(r => r.json())
-      .then((data: { name: string; count?: number }[]) => setAllItems(data))
-      .catch(() => {})
-  }, [])
-
-  return React.useMemo(() => {
-    const receivedCounts = new Map<string, number>()
-    for (const item of receivedItems) {
-      receivedCounts.set(item.name, (receivedCounts.get(item.name) ?? 0) + 1)
-    }
-
-    return allItems
-      .filter(item => {
-        const got = receivedCounts.get(item.name) ?? 0
-        const max = item.count ?? 1
-        return got < max
-      })
-      .map(item => item.name)
-      .sort()
-  }, [allItems, receivedItems])
-}
-
-function HintsSection({ hints }: { hints: APHint[] }) {
-  const action = useStore(s => s.action)
-  const { items } = useStore()
-  const [hintInput, setHintInput] = useState('')
-  const itemNames = useAllItemNames(items)
-
-  function sendHint() {
-    const v = hintInput.trim()
-    if (!v) return
-    action({ type: 'hintItem', itemName: v })
-    setHintInput('')
-  }
-
+function HintsSection({ hints, locations, slotName }: { hints: APHint[]; locations: APLocation[]; slotName: string }) {
   return (
     <div style={{ marginTop: 40 }}>
       <div className="mono" style={{ fontSize: 10.5, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--ink-3)', marginBottom: 14 }}>Hints</div>
-
-      <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-        <HintComboBox value={hintInput} onChange={setHintInput} items={itemNames} />
-        <button className="btn" onClick={sendHint} disabled={!hintInput.trim()}>Hint</button>
-      </div>
-
-      {hints.length === 0
-        ? <div className="muted mono" style={{ fontSize: 12 }}>No hints yet. Use !hint in chat or the input above.</div>
-        : (
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid var(--rule)' }}>
-                {['Item', 'Location', 'Finder', 'Receiver', 'Found'].map(h => (
-                  <th key={h} className="mono" style={{ textAlign: 'left', padding: '4px 10px 8px', fontSize: 10.5, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '.06em', fontWeight: 500 }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {hints.map((h, i) => (
-                <tr key={i} style={{ borderBottom: '1px solid color-mix(in oklch, var(--rule) 50%, transparent)' }}>
-                  <td style={{ padding: '6px 10px' }}>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                      <img src={imgUrl(h.item)} alt="" style={{ width: 18, height: 18, objectFit: 'contain' }}
-                        onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
-                      {h.item}
-                    </span>
-                  </td>
-                  <td style={{ padding: '6px 10px', color: 'var(--ink-2)' }}>{h.location}</td>
-                  <td style={{ padding: '6px 10px', color: 'var(--ink-2)' }}>{h.finder}</td>
-                  <td style={{ padding: '6px 10px', color: 'var(--ink-2)' }}>{h.receiver}</td>
-                  <td style={{ padding: '6px 10px' }}>
-                    <span style={{ color: h.found ? 'var(--ok)' : 'var(--ink-4)' }}>{h.found ? '✓' : '—'}</span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )
-      }
+      <HintedItems hints={hints} locations={locations} slotName={slotName} />
     </div>
   )
 }
 
 export function ItemsScreen() {
-  const { items, hints, char } = useStore()
+  const { items, hints, char, locations, slotName } = useStore()
   const [search, setSearch] = useState('')
   const [gemSort, setGemSort] = useState<GemSort>('alpha')
   // Built from store items (reqLevel enriched by main process) rather than a
@@ -360,12 +232,18 @@ export function ItemsScreen() {
 
   const searchLower = search.toLowerCase()
   const filteredItems = searchLower
-    ? items.filter(i => i.name.toLowerCase().includes(searchLower))
+    ? items.filter(i =>
+        i.name.toLowerCase().includes(searchLower) ||
+        (GEM_CATS.has(categorizeItem(i)) && getGemTags(i.name).includes(searchLower))
+      )
     : items
 
   const classItems = new Set(CLASS_TREE.flatMap(r => [r.base, ...r.asc]))
-  const receivedNames = new Set(filteredItems.map(i => i.name))
-  const hasClassItems = CLASS_TREE.some(r => receivedNames.has(r.base) || r.asc.some(a => receivedNames.has(a)))
+  const allReceivedNames = new Set(items.map(i => i.name))
+  const hasClassItems = CLASS_TREE.some(r => allReceivedNames.has(r.base) || r.asc.some(a => allReceivedNames.has(a)))
+  const classSearchMatches = searchLower
+    ? new Set([...classItems].filter(n => n.toLowerCase().includes(searchLower)))
+    : null
   const hasGemItems = filteredItems.some(i => GEM_CATS.has(categorizeItem(i)))
 
   const grouped: Record<string, Record<string, number>> = {}
@@ -421,7 +299,7 @@ export function ItemsScreen() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24, padding: '10px 14px', background: 'var(--bg-3)', borderRadius: 6, border: '1px solid var(--rule)' }}>
             <img src={imgUrl('Progressive passive point')} alt=""
               style={{ width: 28, height: 28, objectFit: 'contain', flexShrink: 0 }}
-              onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+              onError={imgOnError} />
             <span style={{ fontSize: 13, fontWeight: 500 }}>Passive Points</span>
             <span style={{
               fontSize: 13, fontWeight: 600,
@@ -439,23 +317,28 @@ export function ItemsScreen() {
         )}
 
         {/* Classes & Ascendancies */}
-        {hasClassItems && <ClassSection receivedNames={receivedNames} />}
+        {hasClassItems && <ClassSection receivedNames={allReceivedNames} searchMatchNames={classSearchMatches} />}
 
         {/* Item categories */}
         {CAT_ORDER.map(cat => {
           const entries = Object.entries(grouped[cat] ?? {}).sort((a, b) => a[0].localeCompare(b[0]))
-          if (entries.length === 0) return null
-          return <CatSection key={cat} cat={cat} entries={entries} gemSort={gemSort} gemLevelReq={gemLevelReq} />
+          return (
+            <React.Fragment key={cat}>
+              {entries.length > 0 && <CatSection cat={cat} entries={entries} gemSort={gemSort} gemLevelReq={gemLevelReq} />}
+              {cat === 'Utility Gems' && items.length > 0 && <GemModifiersSection receivedNames={allReceivedNames} />}
+            </React.Fragment>
+          )
         })}
 
-        {/* Hints */}
-        <HintsSection hints={hints} />
 
         {/* Paper doll — visible below 1650px, hidden at wide breakpoint where it moves to sidebar */}
         <div className="items-paperdoll-bottom">
           <div className="mono" style={{ fontSize: 10.5, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--ink-3)', marginBottom: 14, marginTop: 40 }}>Equipment</div>
           <PaperDoll items={items} />
         </div>
+
+        {/* Hints */}
+        <HintsSection hints={hints} locations={locations} slotName={slotName} />
       </div>
 
       {/* Paper doll sidebar — only visible at wide breakpoint */}

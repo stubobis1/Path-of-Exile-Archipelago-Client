@@ -413,6 +413,12 @@ export function initGemTooltips() {
   ;(window as any).gemTooltip = { clearCache: clearGemCache }
 }
 
+export function getGemTags(name: string): string {
+  const d = memCache.get(name)
+  if (!d || 'notFound' in d || 'error' in d) return ''
+  return (d.fields.gem_tags || '').toLowerCase()
+}
+
 export function clearGemCache() {
   const keys = Object.keys(localStorage).filter(k => k.startsWith(LS_PREFIX))
   keys.forEach(k => localStorage.removeItem(k))

@@ -1,6 +1,7 @@
 import { app, BrowserWindow, protocol, net, globalShortcut } from 'electron'
 import * as path from 'path'
 import * as url from 'url'
+import * as fs from 'fs'
 
 import { initIpc, getFullState, clearFilters } from './ipc'
 import { clientTxtWatcher } from './services/clientTxtWatcher'
@@ -14,6 +15,7 @@ function registerApAssetsProtocol(): void {
     const relPath = decodeURIComponent(reqUrl.pathname)
     const imgRoot = path.resolve(__dirname, '../../resources')
     const fullPath = path.join(imgRoot, relPath)
+    if (!fs.existsSync(fullPath)) return new Response(null, { status: 404 })
     return net.fetch(url.pathToFileURL(fullPath).toString())
   })
 }

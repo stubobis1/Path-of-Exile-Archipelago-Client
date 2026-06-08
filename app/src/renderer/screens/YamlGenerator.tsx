@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
+import { imgOnError } from '../imgError'
 import poeOptionsJson from '../../data/poe_options.json'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -488,7 +489,7 @@ function StartInventoryOpt({ value, onChange, allItems }: {
               background: 'var(--bg)', border: '1px solid var(--accent-2)',
               borderRadius: 3, padding: '4px 8px' }}>
               <img src={imgUrl(item)} alt="" style={{ width: 20, height: 20, objectFit: 'contain', flexShrink: 0 }}
-                onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                onError={imgOnError} />
               <span style={{ flex: 1, fontSize: 12, color: 'var(--accent)', fontFamily: 'var(--mono)' }}>{item}</span>
               <input type="number" min={1} max={99} value={n}
                 onChange={e => setCount(item, Math.max(1, Number(e.target.value)))}
@@ -528,7 +529,7 @@ function StartInventoryOpt({ value, onChange, allItems }: {
                   color: i === activeIdx ? 'var(--ink)' : 'var(--ink-2)',
                 }}>
                 <img src={imgUrl(n)} alt="" style={{ width: 22, height: 22, objectFit: 'contain', flexShrink: 0 }}
-                  onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                  onError={imgOnError} />
                 <span className="mono">{n}</span>
               </li>
             ))}
@@ -603,7 +604,7 @@ function ComboSetOpt({ value, onChange, allItems }: {
               background: 'var(--bg)', border: '1px solid var(--accent-2)',
               borderRadius: 3, padding: '4px 8px' }}>
               <img src={imgUrl(item)} alt="" style={{ width: 20, height: 20, objectFit: 'contain', flexShrink: 0 }}
-                onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                onError={imgOnError} />
               <span style={{ flex: 1, fontSize: 12, color: 'var(--accent)', fontFamily: 'var(--mono)' }}>{item}</span>
               <button type="button" onClick={() => remove(item)}
                 style={{ background: 'none', border: 'none', color: 'var(--ink-4)',
@@ -638,7 +639,7 @@ function ComboSetOpt({ value, onChange, allItems }: {
                   color: i === activeIdx ? 'var(--ink)' : 'var(--ink-2)',
                 }}>
                 <img src={imgUrl(n)} alt="" style={{ width: 22, height: 22, objectFit: 'contain', flexShrink: 0 }}
-                  onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                  onError={imgOnError} />
                 <span className="mono">{n}</span>
               </li>
             ))}

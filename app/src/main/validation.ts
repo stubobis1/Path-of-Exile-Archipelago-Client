@@ -130,6 +130,8 @@ export function validateCharEquipment(char: GGGCharacter, ctx: ValidationCtx): V
       }
       const alt = altGems[bt]
       if (alt) {
+        if (!receivedNames.includes('Alternate Gems'))
+          errors.push({ slot: `${inv}:gem`, msg: `Alt gem ${bt} requires "Alternate Gems"` })
         if (!receivedNames.includes(alt.baseGem))
           errors.push({ slot: `${inv}:gem`, msg: `Alt gem ${bt} requires ${alt.baseGem}` })
         continue

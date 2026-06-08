@@ -266,6 +266,7 @@ details:not([open]) .details-arrow { transform: rotate(-90deg); }
 .class-card.received img  { opacity: 1; filter: none; }
 .class-card.received.base { border-color: #4a2a10; color: #e08858; }
 .class-card.received.asc  { border-color: #4a2a10; color: var(--accent); }
+.class-card.search-match  { border-color: #c8a830; color: #f0d060; background: #2a2000; box-shadow: 0 0 0 2px #c8a830, 0 0 10px 2px #c8a83060; }
 .item-tag { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.15rem 0.4rem 0.15rem 0.2rem; font-size: 0.78rem; background: var(--bg-3); border: 1px solid var(--rule); border-radius: 2px; color: var(--ink); }
 .item-img { width: 22px; height: 22px; object-fit: contain; flex-shrink: 0; }
 .item-tag:not(.gem):not(.support):not(.util) .item-img { width: 44px; height: 44px; }

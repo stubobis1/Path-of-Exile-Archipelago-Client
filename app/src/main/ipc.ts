@@ -109,6 +109,18 @@ export function initIpc(): void {
     }).catch(e => logger.warn('[init] char reload failed:', e?.message))
   }
 
+  // Auto-connect to AP server if credentials are stored and GGG token is valid
+  if (getValidToken() && s.serverAddress && s.slotName) {
+    logger.info('[init] auto-connecting to AP server:', s.serverAddress, s.slotName)
+    patch({ connection: 'connecting' })
+    apSocket.connect(s.serverAddress, s.slotName, s.password ?? '', state.deathlink)
+      .catch(e => {
+        logger.warn('[init] auto-connect failed:', e?.message)
+        patch({ connection: 'error' })
+        pushChat({ t: timestamp(), kind: 'sys', body: `Auto-connect failed: ${e?.message}` })
+      })
+  }
+
   // AP socket events
   apSocket.on(ev => {
     if (ev.type === 'connected') {
@@ -163,6 +175,12 @@ export function initIpc(): void {
       if (startingChar) pushChat({ t: timestamp(), kind: 'sys', body: `Starting character: ${startingChar}` })
 
       regenFilter()
+
+      // Auto-start monitoring if all statuses are green
+      if (getValidToken() && state.clientTxtPathOk && state.docPathOk && state.filterOk) {
+        logger.info('[init] all statuses green — auto-starting monitoring')
+        handleAction({ type: 'startMonitoring' }).catch(e => logger.warn('[init] auto-start monitoring failed:', e?.message))
+      }
     }
     if (ev.type === 'locationsChecked') {
       const checkedSet = new Set(ev.ids)
@@ -259,7 +277,7 @@ export function initIpc(): void {
       const existing = state.hints.findIndex(
         h => h.item === ev.item && h.location === ev.location && h.finder === ev.finder
       )
-      const hint = { item: ev.item, location: ev.location, finder: ev.finder, receiver: ev.receiver ?? '', found: false }
+      const hint = { item: ev.item, location: ev.location, finder: ev.finder, receiver: ev.receiver ?? '', found: ev.found ?? false }
       if (existing >= 0) {
         state.hints = state.hints.map((h, i) => i === existing ? hint : h)
       } else {

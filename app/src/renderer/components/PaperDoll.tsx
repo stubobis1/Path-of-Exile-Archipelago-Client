@@ -1,4 +1,5 @@
 import React from 'react'
+import { imgOnError } from '../imgError'
 import type { ReceivedItem } from '@shared/types'
 
 export const TIER_LABELS       = ['Normal', 'Magic', 'Rare', 'Unique'] as const
@@ -93,7 +94,7 @@ function EqSlot({ area, title, base, imgFile, linkName, variant = 'row', slotCla
     <div className={`eq-slot${unlocked ? '' : ' eq-slot-empty'}${slotClass ? ` ${slotClass}` : ''}`} style={{ gridArea: area }}>
       <div className="eq-slot-title">{title}</div>
       <img className="eq-slot-img" src={imgUrl(imgFile)} alt={title}
-        onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+        onError={imgOnError} />
       {variant === 'stack' && <TierStack tiers={tiers} labels={TIER_LABELS} css={TIER_CLS} />}
       {variant === '2col'  && <Tier2col tiers={tiers} />}
       {variant === 'row'   && <TierRow  tiers={tiers} labels={TIER_LABELS} css={TIER_CLS} />}
@@ -112,7 +113,7 @@ function MultiSlot({ area, title, subs, linkName, imgFile, slotClass = '' }: {
       <div className="eq-slot-title">{title}</div>
       {imgFile && (
         <img className="eq-slot-img" src={imgUrl(imgFile)} alt={title}
-          onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+          onError={imgOnError} />
       )}
       <div className="eq-sub-list">
         {subs.map(sub => (
@@ -143,7 +144,7 @@ function FlaskSlot({ slotNum }: { slotNum: number }) {
     <div className={`eq-slot${unlocked ? '' : ' eq-slot-empty'}`}>
       <div className="eq-slot-title">Flask {slotNum}</div>
       <img className="eq-slot-img" src={imgUrl('Progressive Normal Flask Unlock')} alt={`Flask ${slotNum}`}
-        onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+        onError={imgOnError} />
       <TierStack tiers={tiers} labels={FLASK_TIER_LABELS} css={FLASK_TIER_CLS} />
     </div>
   )

@@ -9,7 +9,7 @@ export type APEvent =
   | { type: 'disconnected' }
   | { type: 'item'; item: ReceivedItem }
   | { type: 'chat'; who: string; msg: string }
-  | { type: 'hint'; finder: string; receiver: string; location: string; item: string }
+  | { type: 'hint'; finder: string; receiver: string; location: string; item: string; found: boolean }
   | { type: 'locationsChecked'; ids: number[] }
   | { type: 'deathlink'; source: string }
   | { type: 'error'; msg: string }
@@ -142,6 +142,7 @@ function createAPSocket() {
           receiver: h.item?.receiver?.alias ?? h.receivingPlayer?.alias ?? h.receiving_player ?? '',
           location: h.item?.locationName ?? h.locationName ?? h.location_name ?? '',
           item:     h.item?.name ?? h.itemName ?? h.item_name ?? '',
+          found:    h.found ?? h.item?.found ?? false,
         })
         if (client.items?.on) {
           client.items.on('hintsInitialized', (hints: any[]) => hints.forEach(emitHint))
