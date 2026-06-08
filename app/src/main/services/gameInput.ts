@@ -61,6 +61,18 @@ clientTxtWatcher.on(ev => {
   }
 })
 
+async function getForegroundTitleWin(): Promise<string> {
+  const script = [
+    'Add-Type -TypeDefinition \'using System;using System.Runtime.InteropServices;',
+    'public class W{[DllImport("user32")]public static extern IntPtr GetForegroundWindow();',
+    '[DllImport("user32")]public static extern int GetWindowText(IntPtr h,System.Text.StringBuilder s,int n);}\';',
+    '$h=[W]::GetForegroundWindow();$b=New-Object System.Text.StringBuilder(256);',
+    '[W]::GetWindowText($h,$b,256)|Out-Null;$b.ToString()',
+  ].join('')
+  const { stdout } = await execFileAsync('powershell', ['-NoProfile', '-NonInteractive', '-Command', script], { timeout: 4000 })
+  return stdout.trim()
+}
+
 /** Returns `true` if xdotool is installed (always true on non-Linux). */
 export async function checkXdotool(): Promise<boolean> {
   if (process.platform === 'win32') return true
@@ -76,8 +88,31 @@ export async function checkXdotool(): Promise<boolean> {
 export async function isPoeFocused(): Promise<boolean> {
   const s = settingsService.get()
   if (s.bypassFocusCheck) return true
-  // If PoE never emits [WINDOW] focus events, assume focused rather than blocking all sends.
-  if (!seenFocusEvent) return true
+
+  const mode = s.focusDetectionMode ?? 'os'
+
+  if (mode === 'os' && process.platform === 'win32') {
+    try {
+      const title = await getForegroundTitleWin()
+      return title.toLowerCase().includes('path of exile')
+    } catch (e: any) {
+      logger.warn('[gameInput] OS focus check failed, falling back to clienttxt:', e?.message)
+      // fall through to clienttxt
+    }
+  }
+
+  // clienttxt mode (or OS fallback)
+  if (!seenFocusEvent) {
+    // PoE hasn't emitted [WINDOW] events — use OS title check on Windows rather
+    // than blindly assuming focused, which would send keystrokes to any foreground app.
+    if (process.platform === 'win32') {
+      try {
+        const title = await getForegroundTitleWin()
+        return title.toLowerCase().includes('path of exile')
+      } catch {}
+    }
+    return true  // non-Windows: keep existing assume-focused behaviour
+  }
   return poeWindowFocused
 }
 

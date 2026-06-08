@@ -2,7 +2,7 @@ import { settingsService } from './services/settings'
 import { getCachedCharacter } from './services/gggApi'
 import { openChatAndSend, queueChatSend } from './services/gameInput'
 import { getItems } from './data'
-import { state, patch, pushChat, timestamp, settingsCtx, getPendingGoalToken, setPendingGoalToken } from './ipc-state'
+import { state, patch, pushChat, timestamp, settingsCtx } from './ipc-state'
 
 let _pendingCharToken: string | null = null
 
@@ -127,7 +127,7 @@ function dispatchCommand(cmd: string): string | null {
 
   switch (key) {
     case '!help':
-      return '!gear !weapons !armor !links !flasks !gems !main gems !support gems !utility gems !usable gems !ascendancy !passives !deathlink !whisper updates !goal !boss !help'
+      return '!gear !weapons !armor !links !flasks !gems !main gems !support gems !utility gems !usable gems !usable skill gems !usable support gems !usable utility gems !ascendancy !passives !deathlink !whisper updates !goal !boss !help'
 
     case '!gear':    return `Gear: ${gearMessage('Gear')}`
     case '!weapons': return `Weapons: ${gearMessage('Weapon')}`
@@ -224,17 +224,6 @@ function dispatchCommand(cmd: string): string | null {
 
 export async function handleChatCommand(who: string, msg: string): Promise<void> {
   const trimmed = msg.trim()
-
-  // Zone goal verification: char whispers back the token to confirm in-game identity
-  const goalToken = getPendingGoalToken()
-  if (goalToken && trimmed.includes(goalToken) && who === (state.char?.name ?? state.slotName)) {
-    setPendingGoalToken(null)
-    if (state.goal && !state.goal.eligible) {
-      patch({ goal: { ...state.goal, eligible: true } })
-      pushChat({ t: timestamp(), kind: 'sys', body: 'Character verified — click Send Goal to complete!' })
-    }
-    return
-  }
 
   // Self-whisper char identification token — must be checked before the owner guard
   if (_pendingCharToken && trimmed === `char_${_pendingCharToken}`) {

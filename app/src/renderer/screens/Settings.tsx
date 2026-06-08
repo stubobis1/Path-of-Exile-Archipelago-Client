@@ -51,6 +51,7 @@ export function SettingsScreen({ scrollTo }: { scrollTo?: string }) {
   const [goalChatVerify, setGoalChatVerify] = useState(true)
   const [filterDisplay, setFilterDisplay] = useState(0)
   const [filterSound,   setFilterSound]   = useState(2)
+  const [focusMode, setFocusMode] = useState<'os' | 'clienttxt'>('os')
   const [delayEnter, setDelayEnter] = useState(0)
   const [delayPaste, setDelayPaste] = useState(0)
   const [debounceZone,    setDebounceZone]    = useState(0)
@@ -70,6 +71,7 @@ export function SettingsScreen({ scrollTo }: { scrollTo?: string }) {
         docPath:    s.poeDocPath      ?? '',
         baseFilter: s.baseItemFilter  ?? '',
       })
+      setFocusMode(s.focusDetectionMode ?? 'os')
       setWhisper(s.whisperUpdates  ?? true)
       setGoalChatVerify(s.goalChatVerify ?? true)
       setFilterDisplay(s.filterDisplay ?? 0)
@@ -251,6 +253,17 @@ export function SettingsScreen({ scrollTo }: { scrollTo?: string }) {
           </Row>
         </Section>
         <Section title="Game Input">
+          {navigator.platform.startsWith('Win') && (
+            <Row label="Focus detection" note="How to detect whether Path of Exile is the active window. OS uses PowerShell (more reliable). Client.txt reads [WINDOW] log events.">
+              <div className="seg" style={{ fontSize: 11.5 }}>
+                {(['os', 'clienttxt'] as const).map(v => (
+                  <div key={v} className={`opt${focusMode === v ? ' active' : ''}`} onClick={() => { setFocusMode(v); save('focusDetectionMode')(v) }}>
+                    {v === 'os' ? 'OS (PowerShell)' : 'Client.txt'}
+                  </div>
+                ))}
+              </div>
+            </Row>
+          )}
           <Row label="Item whispers" note="Show a whisper in-game when you receive a new item.">
             <Toggle on={whisper} onChange={v => { setWhisper(v); action({ type: 'setWhisperUpdates', enabled: v }) }} />
           </Row>

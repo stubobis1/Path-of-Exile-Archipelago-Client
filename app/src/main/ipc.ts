@@ -12,7 +12,7 @@ import { apSocket } from './services/apSocket'
 import { getItems, getBosses, getBaseItems, getLevelLocations, getAreaLocations } from './data'
 import { logger } from './services/logger'
 import { checkGoalZone, checkBossDrops } from './validation'
-import { state, patch, pushChat, timestamp, sc, setSettingsContext, setGameOpts, setPendingGoalToken } from './ipc-state'
+import { state, patch, pushChat, timestamp, settingsCtx as sc, setSettingsContext, setGameOpts } from './ipc-state'
 import { regenFilter, handleZoneEntry, clearFilters, markNewItemReceived } from './ipc-filter'
 import { handleChatCommand } from './ipc-chat'
 import { handleAction } from './ipc-actions'
@@ -297,23 +297,10 @@ export function initIpc(): void {
       }
 
       if (state.goal && !state.goal.complete) {
-        // Zone-based goals: verify character is in the goal zone
+        // Zone-based goals: enable Send Goal as soon as the zone is reached
         if (checkGoalZone(state.goal.type, ev.zone) && !state.goal.eligible) {
-          const ws = settingsService.get(...sc())
-          if (ws.goalChatVerify && state.char) {
-            // Send a token whisper and wait for the char to echo it back
-            const token = Math.random().toString(36).slice(2, 8)
-            setPendingGoalToken(token)
-            queueChatSend(`@${state.char.name} ${token}`)
-            pushChat({ t: timestamp(), kind: 'sys', body: 'Goal zone reached — verifying character in-game...' })
-          } else {
-            // Direct: trust Client.txt zone entry, confirm character is known
-            const knownChar = state.char?.name ?? state.charName
-            if (knownChar) {
-              patch({ goal: { ...state.goal, eligible: true } })
-              pushChat({ t: timestamp(), kind: 'sys', body: 'Goal zone reached — click Send Goal to complete!' })
-            }
-          }
+          patch({ goal: { ...state.goal, eligible: true } })
+          pushChat({ t: timestamp(), kind: 'sys', body: 'Goal zone reached — click Send Goal to complete!' })
         }
         // Boss defeat goal — detect drops in inventory → check AP location
         // Goal state is updated when the AP server sends back the "defeat X" item

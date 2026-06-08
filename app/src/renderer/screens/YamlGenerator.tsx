@@ -360,7 +360,8 @@ function OptionSetOpt({ opt, value, onChange }: { opt: OptionDef; value: OptionV
 
   if (isLocation) {
     const regularLocs = filtered.filter(k => !k.startsWith('Reach '))
-    const areaLocs    = filtered.filter(k => k.startsWith('Reach '))
+    const levelLocs   = filtered.filter(k => k.startsWith('Reach Level '))
+    const areaLocs    = filtered.filter(k => k.startsWith('Reach ') && !k.startsWith('Reach Level '))
     const gridStyle: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 4 }
     const checkItem = (k: string) => (
       <label key={k} style={checkItemStyle(checked.has(k))}>
@@ -368,6 +369,13 @@ function OptionSetOpt({ opt, value, onChange }: { opt: OptionDef; value: OptionV
           style={{ accentColor: 'var(--accent)', margin: 0, cursor: 'pointer' }} />
         {k.replace(/_/g, ' ')}
       </label>
+    )
+    const divider = (label: string) => (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '8px 0 6px' }}>
+        <hr style={{ flex: 1, border: 'none', borderTop: '1px solid var(--rule)', margin: 0 }} />
+        <span style={{ fontSize: 9.5, color: 'var(--ink-4)', fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>{label}</span>
+        <hr style={{ flex: 1, border: 'none', borderTop: '1px solid var(--rule)', margin: 0 }} />
+      </div>
     )
     return (
       <div>
@@ -379,13 +387,9 @@ function OptionSetOpt({ opt, value, onChange }: { opt: OptionDef; value: OptionV
         )}
         <div style={{ maxHeight: 200, overflowY: 'auto' }}>
           {regularLocs.length > 0 && <div style={gridStyle}>{regularLocs.map(checkItem)}</div>}
-          {regularLocs.length > 0 && areaLocs.length > 0 && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '8px 0 6px' }}>
-              <hr style={{ flex: 1, border: 'none', borderTop: '1px solid var(--rule)', margin: 0 }} />
-              <span style={{ fontSize: 9.5, color: 'var(--ink-4)', fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>Areas</span>
-              <hr style={{ flex: 1, border: 'none', borderTop: '1px solid var(--rule)', margin: 0 }} />
-            </div>
-          )}
+          {regularLocs.length > 0 && levelLocs.length > 0 && divider('Levels')}
+          {levelLocs.length > 0 && <div style={gridStyle}>{levelLocs.map(checkItem)}</div>}
+          {(regularLocs.length > 0 || levelLocs.length > 0) && areaLocs.length > 0 && divider('Areas')}
           {areaLocs.length > 0 && <div style={gridStyle}>{areaLocs.map(checkItem)}</div>}
         </div>
       </div>

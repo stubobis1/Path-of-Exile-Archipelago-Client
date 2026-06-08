@@ -187,11 +187,17 @@ function Step3Connect({ onNext }: { onNext: () => void }) {
 }
 
 function Step4Character({ onNext }: { onNext: () => void }) {
+  const { oauthStatus } = useStore()
   return (
     <div style={{ maxWidth: 680, display: 'grid', gap: 20 }}>
       <p style={{ color: 'var(--ink-2)', fontSize: 14, maxWidth: 560, lineHeight: 1.55, margin: 0 }}>
         Enter your PoE character name so the client can pull your equipment and gems from the GGG API.
       </p>
+      {oauthStatus !== 'valid' && (
+        <div style={{ fontSize: 13, color: 'var(--warn, #c8a84b)', fontFamily: 'var(--mono)' }}>
+          Complete Step 2 (GGG Login) first.
+        </div>
+      )}
       <CharacterPicker />
       <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
         <button className="btn ghost" onClick={onNext}>skip</button>

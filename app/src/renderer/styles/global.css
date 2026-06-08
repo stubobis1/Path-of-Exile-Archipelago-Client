@@ -275,8 +275,8 @@ details:not([open]) .details-arrow { transform: rotate(-90deg); }
 .sort-btn:hover { border-color: var(--accent); color: var(--ink); }
 .sort-btn.active { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
 .item-tag.gem     { border-color: #2a5a2a; color: #a5f3a5; }
-.item-tag.support { border-color: #5a2a2a; color: #e87070; }
-.item-tag.util    { border-color: #1a3a5a; color: #70aae8; }
+.item-tag.support { border-color: #2a5a2a; color: #a5f3a5; }
+.item-tag.util    { border-color: #2a5a2a; color: #a5f3a5; }
 .item-tag.flask   { border-color: #4a3a10; color: #e8c860; }
 .item-tag.weapon  { border-color: #3a2a10; color: #c8a870; }
 .item-tag.armour  { border-color: #2a3a4a; color: #70e8c8; }

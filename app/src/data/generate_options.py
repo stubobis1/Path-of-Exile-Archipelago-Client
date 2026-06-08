@@ -145,11 +145,14 @@ def main():
     # Order locations by AP ID (source-file order) rather than alphabetically.
     base_items_path  = os.path.join(BASE, 'worlds', 'poe', 'data', 'BaseItems.json')
     level_locs_path  = os.path.join(BASE, 'worlds', 'poe', 'data', 'LevelLocations.json')
+    area_locs_path   = os.path.join(BASE, 'worlds', 'poe', 'data', 'AreaLocations.json')
     bosses_data_path = os.path.join(BASE, 'worlds', 'poe', 'data', 'Bosses.json')
     with open(base_items_path, encoding='utf-8') as f:
         base_items_raw = json.load(f)
     with open(level_locs_path, encoding='utf-8') as f:
         level_locs_raw = json.load(f)
+    with open(area_locs_path, encoding='utf-8') as f:
+        area_locs_raw = json.load(f)
     with open(bosses_data_path, encoding='utf-8') as f:
         bosses_order_raw = json.load(f)
     _seen: set = set()
@@ -161,6 +164,10 @@ def main():
     for item in level_locs_raw:
         name = item['name']
         if name in locs_map and name not in _seen:
+            _ordered.append(name); _seen.add(name)
+    for item in area_locs_raw:
+        name = f"Reach {item['areaName']}"
+        if name not in _seen:
             _ordered.append(name); _seen.add(name)
     for key in bosses_order_raw:
         name = f'defeat {key}'

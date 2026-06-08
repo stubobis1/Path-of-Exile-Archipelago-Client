@@ -129,9 +129,15 @@ export async function handleZoneEntry(zone: string): Promise<void> {
     }
   }
 
-  // Area arrival location
+  // Area arrival location — strip leading "The " from both sides before comparing
+  // so "The Coast" matches a location named "Reach Coast" (or vice versa)
   if (gameOpts.areaLocationsAsLocations !== false && zone) {
-    const loc = missingWithNames.find(l => l.name === `Reach ${zone}`)
+    const stripThe = (s: string) => s.replace(/^the\s+/i, '').trim()
+    const normZone = stripThe(zone)
+    const loc = missingWithNames.find(l => {
+      const locZone = stripThe(l.name.replace(/^Reach\s+/i, ''))
+      return locZone === normZone
+    })
     if (loc) toCheck.add(loc.id)
   }
 

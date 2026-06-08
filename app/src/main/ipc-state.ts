@@ -77,7 +77,7 @@ export function buildValidationCtx() {
   return {
     receivedItems:        state.items,
     gucciMode:            (_gameOpts.gucciHobo ?? 0) as number,
-    passivePointsAsItems: _gameOpts.passivePointsAsItems !== false,
+    passivePointsAsItems: !!_gameOpts.passivePointsAsItems,
   }
 }
 

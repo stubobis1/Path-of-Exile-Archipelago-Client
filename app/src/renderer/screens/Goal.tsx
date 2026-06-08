@@ -17,6 +17,7 @@ const GOAL_NAMES: Record<number, string> = {
 
 export function GoalScreen() {
   const { goal, action } = useStore()
+  const [confirming, setConfirming] = React.useState(false)
 
   if (!goal) {
     return (
@@ -116,22 +117,42 @@ export function GoalScreen() {
         {/* Send Goal button */}
         {!goal.complete && (
           <div style={{ marginTop: 32 }}>
-            <button
-              className="btn"
-              style={{
-                padding: '10px 28px',
-                fontSize: 14,
-                fontWeight: 600,
-                background: canSend ? 'var(--ok)' : undefined,
-                color: canSend ? '#fff' : undefined,
-                cursor: canSend ? 'pointer' : 'not-allowed',
-                opacity: canSend ? 1 : 0.4,
-              }}
-              disabled={!canSend}
-              onClick={() => action({ type: 'sendGoal' })}
-            >
-              Send Goal
-            </button>
+            {confirming ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 13, color: 'var(--ink-2)' }}>Send goal and finish the game?</span>
+                <button
+                  className="btn"
+                  style={{ padding: '8px 20px', fontSize: 13, fontWeight: 600, background: 'var(--ok)', color: '#fff' }}
+                  onClick={() => { setConfirming(false); action({ type: 'sendGoal' }) }}
+                >
+                  Confirm
+                </button>
+                <button
+                  className="btn"
+                  style={{ padding: '8px 16px', fontSize: 13 }}
+                  onClick={() => setConfirming(false)}
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button
+                className="btn"
+                style={{
+                  padding: '10px 28px',
+                  fontSize: 14,
+                  fontWeight: 600,
+                  background: canSend ? 'var(--ok)' : undefined,
+                  color: canSend ? '#fff' : undefined,
+                  cursor: canSend ? 'pointer' : 'not-allowed',
+                  opacity: canSend ? 1 : 0.4,
+                }}
+                disabled={!canSend}
+                onClick={() => setConfirming(true)}
+              >
+                Send Goal
+              </button>
+            )}
             {!goal.eligible && (
               <div className="muted mono" style={{ fontSize: 11, marginTop: 8 }}>
                 {goal.type === 10

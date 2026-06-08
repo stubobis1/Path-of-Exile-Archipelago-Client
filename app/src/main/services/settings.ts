@@ -11,6 +11,7 @@ const DEFAULTS: Settings = {
   whisperUpdates:   true,
   goalChatVerify:   true,
   bypassFocusCheck: false,
+  focusDetectionMode: 'os' as const,
   inputDelayEnter:      process.platform === 'linux' ? 350 : 0,
   inputDelayPaste:      0,
   inputDebounceZone:    0,

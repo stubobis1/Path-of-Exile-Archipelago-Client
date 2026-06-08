@@ -17,10 +17,11 @@ const WEAPON_TYPES   = ['Axe', 'Bow', 'Claw', 'Dagger', 'Mace', 'Sceptre', 'Staf
 const IGNORE_INV_IDS = new Set(['BrequelGrafts', 'BrequelGrafts2'])
 
 export interface ValidationCtx {
-  receivedItems: ReceivedItem[]
-  gucciMode?:    number
-  goal?:         number
-  seedName?:     string
+  receivedItems:        ReceivedItem[]
+  gucciMode?:           number
+  goal?:                number
+  seedName?:            string
+  passivePointsAsItems?: boolean
 }
 
 function rarityName(frameType: number): string {
@@ -173,6 +174,7 @@ export function validateCharEquipment(char: GGGCharacter, ctx: ValidationCtx): V
 }
 
 export function validatePassivePoints(char: GGGCharacter, ctx: ValidationCtx): ValidationError[] {
+  if (!ctx.passivePointsAsItems) return []
   // Count received "Progressive passive point" items (1:1 ratio, no multiplier)
   const passiveItems = ctx.receivedItems.filter(i => i.name === 'Progressive passive point').length
   const allocated    = (char.passives as any)?.hashes?.length ?? 0

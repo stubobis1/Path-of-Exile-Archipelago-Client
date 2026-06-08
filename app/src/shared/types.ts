@@ -18,6 +18,7 @@ export interface Settings {
   whisperUpdates:   boolean
   goalChatVerify:   boolean
   bypassFocusCheck: boolean
+  focusDetectionMode: 'os' | 'clienttxt'
   inputDelayEnter:      number
   inputDelayPaste:      number
   inputDebounceZone:    number
