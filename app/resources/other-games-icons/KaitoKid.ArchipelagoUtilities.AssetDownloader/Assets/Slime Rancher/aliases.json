@@ -1,0 +1,67 @@
+{
+  "Aliases": [
+    {
+      "AliasName": "Tank Booster",
+      "ItemNames": [
+        "Progressive Max Ammo"
+      ]
+    },
+    {
+      "AliasName": "Treasure Cracker",
+      "ItemNames": [
+        "Progressive Treasure Cracker"
+      ]
+    },
+    {
+      "AliasName": "Pulse Wave",
+      "ItemNames": [
+        "Air Burst"
+      ]
+    },
+    {
+      "AliasName": "Water Tank",
+      "ItemNames": [
+        "Liquid Slot"
+      ]
+    },
+    {
+      "AliasName": "Newbuck",
+      "ItemNames": [
+        "75x Newbucks",
+        "81x Newbucks",
+        "99x Newbucks",
+        "100x Newbucks"
+      ]
+    },
+    {
+      "AliasName": "Indigo Quarry",
+      "ItemNames": [
+        "Region Unlock: Indigo Quarry"
+      ]
+    },
+    {
+      "AliasName": "Ancient Ruins",
+      "ItemNames": [
+        "Region Unlock: Ancient Ruins"
+      ]
+    },
+    {
+      "AliasName": "Glass Desert",
+      "ItemNames": [
+        "Region Unlock: Glass Desert"
+      ]
+    },
+    {
+      "AliasName": "Moss Blanket",
+      "ItemNames": [
+        "Region Unlock: Moss Blanket"
+      ]
+    },
+    {
+      "AliasName": "Stonks",
+      "ItemNames": [
+        "Progressive Market Stonks"
+      ]
+    }
+  ]
+}

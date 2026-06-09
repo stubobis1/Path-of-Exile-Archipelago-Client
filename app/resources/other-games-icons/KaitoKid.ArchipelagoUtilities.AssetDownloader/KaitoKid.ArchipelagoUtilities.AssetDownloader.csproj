@@ -1,0 +1,55 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFrameworks>net45;net462;netstandard2.0;net5.0;net6.0</TargetFrameworks>
+		<Nullable>disable</Nullable>
+		<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+		<Authors>KaitoKid</Authors>
+        <Version>3.1.15</Version>
+        <AssemblyVersion>$(Version)</AssemblyVersion>
+        <FileVersion>$(Version)</FileVersion>
+		<Description>.NET library for Archipelago Item Sprites</Description>
+		<PackageProjectUrl>https://github.com/agilbert1412/ArchipelagoUtilities/blob/main/README.md</PackageProjectUrl>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
+		<RepositoryUrl>https://github.com/agilbert1412/ArchipelagoUtilities</RepositoryUrl>
+	</PropertyGroup>
+
+	<PropertyGroup>
+		<PackageLicenseExpression>BSD-3-Clause</PackageLicenseExpression>
+		<IncludeSymbols>True</IncludeSymbols>
+		<SymbolPackageFormat>snupkg</SymbolPackageFormat>
+	</PropertyGroup>
+
+	<Target Name="PostBuild"
+	        AfterTargets="Build"
+	        Condition="'$(Configuration)' == 'Release' And '$(TargetFramework)' == 'net6.0'">
+		<Message Text="Zipping all the assets" Importance="High" />
+		<Exec Command='powershell -ExecutionPolicy Bypass -File "$(ProjectDir)ZipAssets.ps1" -projectDir "$(ProjectDir)"' />
+	</Target>
+
+	<ItemGroup>
+	  <Compile Remove="Assets\**" />
+	  <Compile Remove="ZippedAssets\**" />
+	  <EmbeddedResource Remove="Assets\**" />
+	  <EmbeddedResource Remove="ZippedAssets\**" />
+	  <None Remove="Assets\**" />
+	  <None Remove="ZippedAssets\**" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <ProjectReference Include="..\KaitoKid.Utilities.Interfaces\KaitoKid.Utilities.Interfaces.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <None Include="..\..\README.md" Link="README.md">
+	    <PackagePath>\</PackagePath>
+	    <Pack>True</Pack>
+	  </None>
+	</ItemGroup>
+
+    <Target Name="Copy nuget to release folder" AfterTargets="Pack">
+        <Message Text="Copying the nuget package to the release folder" Importance="High" />
+        <Copy SourceFiles="$(OutputPath)KaitoKid.ArchipelagoUtilities.AssetDownloader.$(Version).nupkg" DestinationFolder="..\..\Release" ContinueOnError="false" />
+        <Message Text="Copied nuget package" Importance="High" />
+    </Target>
+</Project>

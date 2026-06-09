@@ -1,0 +1,95 @@
+{
+  "Aliases": [
+    {
+      "AliasName": "Power Star",
+      "ItemNames": [
+        "Star Bundle",
+        "Overworld Cannon Star",
+        "Bowser 2 Cannon Star"
+     ],
+      "AliasName": "Cannon Unlock BoB",
+      "ItemNames": [
+        "Course 1 Cannon",
+        "Course 2 Cannon",
+        "Course 3 Cannon",
+        "Course 4 Cannon",
+        "Course 5 Cannon",
+        "Course 6 Cannon",
+        "Course 7 Cannon",
+        "Course 8 Cannon",
+        "Course 9 Cannon",
+        "Course 10 Cannon",
+        "Course 11 Cannon",
+        "Course 12 Cannon",
+        "Course 13 Cannon",
+        "Course 14 Cannon",
+        "Course 15 Cannon",
+        "Bowser 1 Cannon",
+        "Bowser 2 Cannon",
+        "Bowser 3 Cannon",
+        "Slide Cannon",
+        "Secret 1 Cannon",
+        "Secret 2 Cannon",
+        "Secret 3 Cannon",
+        "Metal Cap Cannon",
+        "Wing Cap Cannon",
+        "Vanish Cap Cannon",
+        "Overworld Cannon",
+      ]
+    },
+    {
+      "AliasName": "Progressive Key",
+      "ItemNames": [
+        "Key 1",
+        "Key 2"
+      ]
+    },
+    {
+      "AliasName": "Ticket",
+      "ItemNames": [
+        "Course 1 Ticket",
+        "Course 2 Ticket",
+        "Course 3 Ticket",
+        "Course 4 Ticket",
+        "Course 5 Ticket",
+        "Course 6 Ticket",
+        "Course 7 Ticket",
+        "Course 8 Ticket",
+        "Course 9 Ticket",
+        "Course 10 Ticket",
+        "Course 11 Ticket",
+        "Course 12 Ticket",
+        "Course 13 Ticket",
+        "Course 14 Ticket",
+        "Course 15 Ticket",
+        "Bowser 1 Ticket",
+        "Bowser 2 Ticket",
+        "Bowser 3 Ticket",
+        "Slide Ticket",
+        "Secret 1 Ticket",
+        "Secret 2 Ticket",
+        "Secret 3 Ticket",
+        "Metal Cap Ticket",
+        "Wing Cap Ticket",
+        "Vanish Cap Ticket",
+        "Overworld Ticket",
+      ]
+    },
+    {
+      "AliasName": "Badge",
+      "ItemNames": [
+        "Progressive Stomp Badge",
+        "Wall Badge",
+        "Triple Jump Badge",
+        "Lava Badge",
+      ]
+    },
+    {
+      "AliasName": "Blue Star",
+      "ItemNames": [
+        "Blue Star Bundle",
+      ]
+    },
+   
+  ]
+}
