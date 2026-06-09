@@ -13,6 +13,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "sync-data": "node scripts/sync-data.js",
     "postinstall": "electron-rebuild -f -w uiohook-napi || true"
   },
   "dependencies": {

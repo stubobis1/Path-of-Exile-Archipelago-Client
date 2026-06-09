@@ -180,7 +180,7 @@ function createAPSocket() {
     /** Mark a location as checked on the AP server. */
     locationChecked(locationId: number): void {
       if (!client || !_connected) return
-      client.check(locationId)
+      try { client.socket.send({ cmd: 'LocationChecks', locations: [locationId] }) } catch {}
     },
 
     /** Request a hint for the given item name via chat. */
@@ -219,12 +219,10 @@ function createAPSocket() {
       } catch { return [] }
     },
 
-    /** Mark multiple locations as checked on the AP server. */
+    /** Mark multiple locations as checked on the AP server in a single packet. */
     checkLocations(ids: number[]): void {
       if (!client || !_connected || ids.length === 0) return
-      for (const id of ids) {
-        try { client.check(id) } catch {}
-      }
+      try { client.socket.send({ cmd: 'LocationChecks', locations: ids }) } catch {}
     },
 
     /**

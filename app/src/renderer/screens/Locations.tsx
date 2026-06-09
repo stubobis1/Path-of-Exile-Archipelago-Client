@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { useStore } from '../store'
+import { ValidationErrors } from '../components/ValidationErrors'
 import type { APLocation } from '@shared/types'
 import { HintedItems } from '../components/HintedItems'
 
@@ -97,6 +98,7 @@ export function LocationsScreen() {
         <div className="sub">{connection === 'connected' ? `${checked} / ${total} checked` : 'not connected'}</div>
       </div>
       <div style={{ padding: '24px 28px' }}>
+        <ValidationErrors />
         {locations.length === 0 && (
           <div style={{ color: 'var(--ink-3)', fontSize: 13, textAlign: 'center', padding: '60px 0' }}>
             {connection === 'connected'
@@ -109,7 +111,7 @@ export function LocationsScreen() {
         ))}
         <div style={{ marginTop: 40 }}>
           <h2 style={{ fontSize: 15, fontWeight: 600, marginBottom: 24 }}>Hinted Items</h2>
-          <HintedItems hints={hints} locations={locations} slotName={slotName} />
+          <HintedItems hints={hints} locations={locations} slotName={slotName} connected={connection === 'connected'} />
         </div>
       </div>
     </div>

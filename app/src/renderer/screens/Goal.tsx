@@ -1,5 +1,6 @@
 import React from 'react'
 import { useStore } from '../store'
+import { ValidationErrors } from '../components/ValidationErrors'
 
 const GOAL_NAMES: Record<number, string> = {
   0:  'Complete the Campaign',
@@ -50,6 +51,7 @@ export function GoalScreen() {
       </div>
 
       <div style={{ padding: '28px 28px' }}>
+        <ValidationErrors />
 
         {/* Boss defeat goal */}
         {goal.type === 10 && (

@@ -30,7 +30,7 @@ function useAllItemNames(receivedItems: ReceivedItem[]): string[] {
   }, [allItems, receivedItems])
 }
 
-function HintComboBox({ value, onChange, items: names }: { value: string; onChange: (v: string) => void; items: string[] }) {
+function HintComboBox({ value, onChange, items: names, disabled }: { value: string; onChange: (v: string) => void; items: string[]; disabled?: boolean }) {
   const [open, setOpen] = useState(false)
   const [activeIdx, setActiveIdx] = useState(-1)
   const wrapRef = useRef<HTMLDivElement>(null)
@@ -75,8 +75,9 @@ function HintComboBox({ value, onChange, items: names }: { value: string; onChan
         className="input mono" style={{ width: '100%', fontSize: 12, boxSizing: 'border-box' }}
         placeholder="Item name to hint…"
         value={value}
+        disabled={disabled}
         onChange={e => { onChange(e.target.value); setOpen(true) }}
-        onFocus={() => setOpen(true)}
+        onFocus={() => { if (!disabled) setOpen(true) }}
         onKeyDown={onKey}
       />
       {open && filtered.length > 0 && (
@@ -241,10 +242,11 @@ function Empty({ msg }: { msg: string }) {
   return <div style={{ color: 'var(--ink-4)', fontSize: 12, padding: '6px 10px 18px' }}>{msg}</div>
 }
 
-export function HintedItems({ hints, locations, slotName }: {
+export function HintedItems({ hints, locations, slotName, connected }: {
   hints: APHint[]
   locations: APLocation[]
   slotName: string
+  connected?: boolean
 }) {
   const action = useStore(s => s.action)
   const { items } = useStore()
@@ -253,7 +255,7 @@ export function HintedItems({ hints, locations, slotName }: {
 
   function sendHint() {
     const v = hintInput.trim()
-    if (!v) return
+    if (!v || !connected) return
     action({ type: 'hintItem', itemName: v })
     setHintInput('')
   }
@@ -264,9 +266,14 @@ export function HintedItems({ hints, locations, slotName }: {
   const allUnmatched = hints.length > 0 && forMe.length === 0 && atMyLocs.length === 0
 
   const inputRow = (
-    <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-      <HintComboBox value={hintInput} onChange={setHintInput} items={itemNames} />
-      <button className="btn" onClick={sendHint} disabled={!hintInput.trim()}>Hint</button>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 20 }}>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <HintComboBox value={hintInput} onChange={setHintInput} items={itemNames} disabled={!connected} />
+        <button className="btn" onClick={sendHint} disabled={!hintInput.trim() || !connected}>Hint</button>
+      </div>
+      {!connected && (
+        <div className="muted mono" style={{ fontSize: 11 }}>Connect to an Archipelago server to send hints.</div>
+      )}
     </div>
   )
 

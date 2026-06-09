@@ -101,12 +101,47 @@ export async function handleAction(action: IpcAction): Promise<unknown> {
     }
 
     case 'sendCommand': {
-      const cmd = action.cmd.startsWith('/') || action.cmd.startsWith('!')
-        ? action.cmd
-        : `/${action.cmd}`
-      apSocket.sendChat(action.cmd)
-      await openChatAndSend(cmd)
-      pushChat({ t: timestamp(), kind: 'out', body: `→ you ${action.cmd}` })
+      const raw = action.cmd.trim()
+      if (raw.toLowerCase() === '/help') {
+        const sys = (body: string) => pushChat({ t: timestamp(), kind: 'sys', body })
+        sys('── Client ──────────────────────────────────')
+        sys('/help — show this help')
+        sys('── In-game chat (type in PoE) ───────────────')
+        sys('!gear · !weapons · !armour · !links · !flasks')
+        sys('!gems · !main gems · !support gems · !utility gems')
+        sys('!usable gems · !usable skill gems · !usable support gems · !usable utility gems')
+        sys('!ascendancy · !passives · !goal · !boss')
+        sys('!deathlink — toggle DeathLink on/off')
+        sys('!whisper updates — toggle item whispers on/off')
+        sys('── AP Server ────────────────────────────────')
+        sys('!help — list server commands')
+        sys('!license — licensing information')
+        sys('!options — list current options (includes password)')
+        sys('!players — connected and missing players')
+        sys('!status [tag] — team status; optionally filter by tag (e.g. DeathLink)')
+        sys('!release — send your remaining items to their recipients')
+        sys('!collect — send your remaining items to yourself')
+        sys('!countdown [seconds=10] — start a countdown')
+        sys('!remaining — list remaining items (no locations)')
+        sys('!missing [filter] — list unchecked locations')
+        sys('!checked [filter] — list checked locations')
+        sys('!hint [item] — spoiler peek for an item')
+        sys('!hint_location [location] — spoiler peek for a location')
+        sys('!alias [name] — set your display alias')
+        sys('!getitem <item> — cheat in an item (if enabled)')
+        sys('!video <platform> <user> — set stream link (YouTube/Twitch)')
+        sys('!admin login <password> — remote admin login')
+        sys('─────────────────────────────────────────────')
+        return null
+      }
+      apSocket.sendChat(raw)
+      // Only type into PoE game chat for `/` commands — `!` AP server commands must
+      // not be typed in-game as any game-side AP relay would re-send them to the server.
+      if (!raw.startsWith('!')) {
+        const cmd = raw.startsWith('/') ? raw : `/${raw}`
+        await openChatAndSend(cmd)
+      }
+      pushChat({ t: timestamp(), kind: 'out', body: `→ you ${raw}` })
       return null
     }
 

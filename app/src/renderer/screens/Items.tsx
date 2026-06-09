@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { imgOnError } from '../imgError'
+import { ValidationErrors } from '../components/ValidationErrors'
 import { useStore } from '../store'
 import type { ReceivedItem, APHint, APLocation } from '@shared/types'
 import { initGemTooltips, preloadGems, showGemTooltip, hideGemTooltip, moveGemTooltip, getGemTags } from '../services/gemTooltip'
@@ -177,17 +178,17 @@ function ClassSection({ receivedNames, searchMatchNames }: { receivedNames: Set<
 }
 
 
-function HintsSection({ hints, locations, slotName }: { hints: APHint[]; locations: APLocation[]; slotName: string }) {
+function HintsSection({ hints, locations, slotName, connected }: { hints: APHint[]; locations: APLocation[]; slotName: string; connected: boolean }) {
   return (
     <div style={{ marginTop: 40 }}>
       <div className="mono" style={{ fontSize: 10.5, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--ink-3)', marginBottom: 14 }}>Hints</div>
-      <HintedItems hints={hints} locations={locations} slotName={slotName} />
+      <HintedItems hints={hints} locations={locations} slotName={slotName} connected={connected} />
     </div>
   )
 }
 
 export function ItemsScreen() {
-  const { items, hints, char, locations, slotName } = useStore()
+  const { items, hints, char, locations, slotName, connection } = useStore()
   const [search, setSearch] = useState('')
   const [gemSort, setGemSort] = useState<GemSort>('alpha')
   // Built from store items (reqLevel enriched by main process) rather than a
@@ -288,6 +289,7 @@ export function ItemsScreen() {
 
       <div className="items-page-outer">
       <div className="items-page-content">
+        <ValidationErrors />
         {items.length === 0 && (
           <div style={{ color: 'var(--ink-3)', fontSize: 13, textAlign: 'center', padding: '60px 0' }}>
             No items received yet. Connect to an Archipelago server to start.
@@ -338,7 +340,7 @@ export function ItemsScreen() {
         </div>
 
         {/* Hints */}
-        <HintsSection hints={hints} locations={locations} slotName={slotName} />
+        <HintsSection hints={hints} locations={locations} slotName={slotName} connected={connection === 'connected'} />
       </div>
 
       {/* Paper doll sidebar — only visible at wide breakpoint */}

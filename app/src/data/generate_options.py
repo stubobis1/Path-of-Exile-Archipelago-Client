@@ -6,7 +6,7 @@ Run from the Archipelago root directory:
 """
 import sys, os, json, inspect, re
 
-BASE = os.path.dirname(os.path.abspath(__file__))
+BASE = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', '..'))
 sys.path.insert(0, BASE)
 
 try:
@@ -132,21 +132,17 @@ def main():
     }
 
     # ── Inject item/location valid_keys ───────────────────────────────────────
-    manifest_path = os.path.join(BASE, 'worlds', 'poe', 'archipelago.json')
-    items_path    = os.path.join(BASE, 'worlds', 'poe', 'poeClient', 'static', 'poe_items.json')
-    locs_path     = os.path.join(BASE, 'worlds', 'poe', 'poeClient', 'static', 'poe_locations.json')
-
-    with open(manifest_path, encoding='utf-8') as f:
-        manifest = json.load(f)
-    with open(items_path, encoding='utf-8') as f:
-        item_names = sorted(json.load(f).keys())
-    with open(locs_path, encoding='utf-8') as f:
-        locs_map = json.load(f)
-    # Order locations by AP ID (source-file order) rather than alphabetically.
+    manifest_path    = os.path.join(BASE, 'worlds', 'poe', 'archipelago.json')
+    items_data_path  = os.path.join(BASE, 'worlds', 'poe', 'data', 'Items.json')
     base_items_path  = os.path.join(BASE, 'worlds', 'poe', 'data', 'BaseItems.json')
     level_locs_path  = os.path.join(BASE, 'worlds', 'poe', 'data', 'LevelLocations.json')
     area_locs_path   = os.path.join(BASE, 'worlds', 'poe', 'data', 'AreaLocations.json')
     bosses_data_path = os.path.join(BASE, 'worlds', 'poe', 'data', 'Bosses.json')
+
+    with open(manifest_path, encoding='utf-8') as f:
+        manifest = json.load(f)
+    with open(items_data_path, encoding='utf-8') as f:
+        items_raw = json.load(f)
     with open(base_items_path, encoding='utf-8') as f:
         base_items_raw = json.load(f)
     with open(level_locs_path, encoding='utf-8') as f:
@@ -155,29 +151,21 @@ def main():
         area_locs_raw = json.load(f)
     with open(bosses_data_path, encoding='utf-8') as f:
         bosses_order_raw = json.load(f)
-    _seen: set = set()
-    _ordered: list = []
+
+    item_names = sorted({item['name'] for item in items_raw})
+
+    # Build locs_map from data files (ordered by AP ID / source-file order).
+    locs_map: dict = {}
     for item in base_items_raw:
-        name = item.get('name') or item['baseItem']
-        if name in locs_map and name not in _seen:
-            _ordered.append(name); _seen.add(name)
+        locs_map[item.get('name') or item['baseItem']] = True
     for item in level_locs_raw:
-        name = item['name']
-        if name in locs_map and name not in _seen:
-            _ordered.append(name); _seen.add(name)
+        locs_map[item['name']] = True
     for item in area_locs_raw:
-        name = f"Reach {item['areaName']}"
-        if name not in _seen:
-            _ordered.append(name); _seen.add(name)
+        locs_map[f"Reach {item['areaName']}"] = True
     for key in bosses_order_raw:
-        name = f'defeat {key}'
-        if name in locs_map and name not in _seen:
-            _ordered.append(name); _seen.add(name)
-    # Append anything not matched above (future-proofing)
-    for name in locs_map:
-        if name not in _seen:
-            _ordered.append(name)
-    location_names = _ordered
+        locs_map[f'defeat {key}'] = True
+
+    location_names = list(locs_map.keys())
 
     ITEM_OPTS = {'local_items', 'non_local_items', 'start_hints'}
     LOC_OPTS  = {'start_location_hints', 'exclude_locations', 'priority_locations'}

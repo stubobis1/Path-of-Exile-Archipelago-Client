@@ -1,14 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useStore } from '../store'
 import type { ChatMessage } from '@shared/types'
+import { ValidationErrors } from '../components/ValidationErrors'
 
 
-const SLOT_LABELS: Record<string, string> = {
-  BodyArmour: 'Body Armour', Helmet: 'Helmet', Gloves: 'Gloves', Boots: 'Boots',
-  Belt: 'Belt', Amulet: 'Amulet', Ring: 'Ring (left)', Ring2: 'Ring (right)',
-  Weapon: 'Weapon', Offhand: 'Off-hand', Flask: 'Flask',
-  Passives: 'Passive Points', Class: 'Class', GucciHobo: 'Gucci Hobo Mode',
-}
 
 function StatCard({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
   return (
@@ -210,7 +205,7 @@ function MonitoringCard() {
 }
 
 function ItemsPanel({ onNavigate }: { onNavigate: (screen: string, section?: string) => void }) {
-  const { items, char, goal, errors, locations } = useStore()
+  const { items, char, goal, locations } = useStore()
 
   const byCategory = (cat: string) => items.filter(i => i.category?.some(c => c.includes(cat))).length
   const gems         = byCategory('Gem')
@@ -228,21 +223,7 @@ function ItemsPanel({ onNavigate }: { onNavigate: (screen: string, section?: str
       <MonitoringCard />
 
 
-      {/* Errors */}
-      {errors.length > 0 && (
-        <div>
-          <style>{`@keyframes err-pulse { 0%,100% { background: color-mix(in srgb, var(--err) 8%, var(--bg-3)); border-color: color-mix(in srgb, var(--err) 25%, transparent); } 50% { background: color-mix(in srgb, var(--err) 22%, var(--bg-3)); border-color: color-mix(in srgb, var(--err) 60%, transparent); } }`}</style>
-          <SectionLabel>Validation · {errors.length} issue{errors.length !== 1 ? 's' : ''}</SectionLabel>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            {errors.map((e, i) => (
-              <div key={i} style={{ padding: '8px 12px', borderRadius: 5, border: '1px solid', fontSize: 12, animation: 'err-pulse 1.6s ease-in-out infinite' }}>
-                <span style={{ color: 'var(--err)', fontWeight: 600 }}>{SLOT_LABELS[e.slot] ?? e.slot}</span>
-                <span className="muted" style={{ marginLeft: 8 }}>{e.msg}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      <ValidationErrors />
 
       <div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5 }}>
