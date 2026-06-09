@@ -24,6 +24,7 @@ export let state: AppState = {
   whisperUpdates:  true,
   hints:           [],
   locations:       [],
+  playerGames:     {},
   onboardingStep:  1,
   onboardingDone:  false,
   xdotoolOk:       true,

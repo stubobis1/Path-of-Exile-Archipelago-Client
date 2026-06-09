@@ -170,10 +170,12 @@ export interface APHint {
 }
 
 export interface APLocation {
-  id:      number
-  name:    string
-  checked: boolean
-  act:     number | string
+  id:               number
+  name:             string
+  checked:          boolean
+  act:              number | string
+  receiverGame?:     string
+  receiverItemName?: string
 }
 
 // IPC state snapshot pushed from main → renderer
@@ -200,6 +202,7 @@ export interface AppState {
   whisperUpdates: boolean
   hints:       APHint[]
   locations:   APLocation[]
+  playerGames: Record<string, string>
   // onboarding
   onboardingStep: number
   onboardingDone: boolean

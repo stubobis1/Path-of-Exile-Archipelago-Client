@@ -1,12 +1,46 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { imgOnError } from '../imgError'
+import { resolveGameIconFolder } from '../gameIconMap'
 import type { APHint, APLocation, ReceivedItem } from '@shared/types'
 import { useStore } from '../store'
 
 type HintCol = 'Item' | 'Location' | 'Finder' | 'Receiver' | 'Found'
 
-function imgUrl(name: string) {
+const ICONS_BASE = `ap-assets:///other-games-icons/KaitoKid.ArchipelagoUtilities.AssetDownloader/Assets`
+
+function poeImgUrl(name: string) {
   return `ap-assets:///images/${name.toLowerCase().replace(/['\s]/g, '')}.png`
+}
+
+function gameImgUrl(game: string, item: string): string {
+  const folder = resolveGameIconFolder(game)
+  const g      = encodeURIComponent(folder)
+  const slug   = item.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')
+  return `${ICONS_BASE}/${g}/${g}_${slug}.png`
+}
+
+function OtherGameIcon({ game, item, size }: { game: string; item: string; size: number }) {
+  const [fallback, setFallback] = useState(false)
+  const [hide, setHide] = useState(false)
+  const folder   = resolveGameIconFolder(game)
+  const g        = encodeURIComponent(folder)
+  const gameIcon = `${ICONS_BASE}/${g}/${g}.png`
+  if (hide) return <span style={{ width: size, height: size, display: 'inline-block' }} />
+  return (
+    <img
+      src={fallback ? gameIcon : gameImgUrl(game, item)}
+      alt=""
+      style={{ width: size, height: size, objectFit: 'contain', flexShrink: 0 }}
+      onError={fallback ? imgOnError : () => setFallback(true)}
+    />
+  )
+}
+
+function ItemIcon({ item, game, slotName, size }: { item: string; game: string | undefined; slotName: string; size: number }) {
+  if (!game || game === 'Path of Exile') {
+    return <img src={poeImgUrl(item)} alt="" style={{ width: size, height: size, objectFit: 'contain', flexShrink: 0 }} onError={imgOnError} />
+  }
+  return <OtherGameIcon game={game} item={item} size={size} />
 }
 
 function useAllItemNames(receivedItems: ReceivedItem[]): string[] {
@@ -98,7 +132,7 @@ function HintComboBox({ value, onChange, items: names, disabled }: { value: stri
                 background: i === activeIdx ? 'var(--accent-soft)' : 'transparent',
                 color: i === activeIdx ? 'var(--ink)' : 'var(--ink-2)',
               }}>
-              <img src={imgUrl(n)} alt="" style={{ width: 22, height: 22, objectFit: 'contain', flexShrink: 0 }}
+              <img src={poeImgUrl(n)} alt="" style={{ width: 22, height: 22, objectFit: 'contain', flexShrink: 0 }}
                 onError={imgOnError} />
               <span className="mono">{n}</span>
             </li>
@@ -124,10 +158,12 @@ function locDisplayName(name: string): string {
   return name.replace(/\s*-\s*(early\s+)?act\s+\d+$/i, '').replace(/\s*-\s*maps$/i, '')
 }
 
-function SortableHintTable({ hints, cols, locMap }: {
+function SortableHintTable({ hints, cols, locMap, playerGames, slotName }: {
   hints: APHint[]
   cols: HintCol[]
   locMap: Map<string, APLocation>
+  playerGames: Record<string, string>
+  slotName: string
 }) {
   const [sortCol, setSortCol] = useState<HintCol>(cols[0])
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
@@ -186,8 +222,7 @@ function SortableHintTable({ hints, cols, locMap }: {
                   if (col === 'Item') return (
                     <td key={col} style={{ padding: '6px 10px' }}>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                        <img src={imgUrl(h.item)} alt="" style={{ width: 18, height: 18, objectFit: 'contain' }}
-                          onError={imgOnError} />
+                        <ItemIcon item={h.item} game={playerGames[h.receiver]} slotName={slotName} size={18} />
                         {h.item}
                       </span>
                     </td>
@@ -249,7 +284,7 @@ export function HintedItems({ hints, locations, slotName, connected }: {
   connected?: boolean
 }) {
   const action = useStore(s => s.action)
-  const { items } = useStore()
+  const { items, playerGames } = useStore()
   const [hintInput, setHintInput] = useState('')
   const itemNames = useAllItemNames(items)
 
@@ -291,7 +326,7 @@ export function HintedItems({ hints, locations, slotName, connected }: {
       <div>
         {inputRow}
         <CollapsibleSection label="All hints" count={hints.length}>
-          <SortableHintTable hints={hints} cols={['Item', 'Location', 'Finder', 'Receiver', 'Found']} locMap={locMap} />
+          <SortableHintTable hints={hints} cols={['Item', 'Location', 'Finder', 'Receiver', 'Found']} locMap={locMap} playerGames={playerGames} slotName={slotName} />
         </CollapsibleSection>
       </div>
     )
@@ -303,13 +338,13 @@ export function HintedItems({ hints, locations, slotName, connected }: {
       <CollapsibleSection label={`For ${slotName || 'You'}`} count={forMe.length}>
         {forMe.length === 0
           ? <Empty msg="No hints for your slot yet." />
-          : <SortableHintTable hints={forMe} cols={['Item', 'Location', 'Finder', 'Found']} locMap={locMap} />
+          : <SortableHintTable hints={forMe} cols={['Item', 'Location', 'Finder', 'Found']} locMap={locMap} playerGames={playerGames} slotName={slotName} />
         }
       </CollapsibleSection>
       <CollapsibleSection label={`At ${slotName ? `${slotName}'s` : 'Your'} Locations`} count={atMyLocs.length}>
         {atMyLocs.length === 0
           ? <Empty msg="No hints point to your locations yet." />
-          : <SortableHintTable hints={atMyLocs} cols={['Item', 'Location', 'Receiver', 'Found']} locMap={locMap} />
+          : <SortableHintTable hints={atMyLocs} cols={['Item', 'Location', 'Receiver', 'Found']} locMap={locMap} playerGames={playerGames} slotName={slotName} />
         }
       </CollapsibleSection>
     </div>

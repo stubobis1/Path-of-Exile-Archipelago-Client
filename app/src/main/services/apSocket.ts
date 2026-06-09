@@ -5,12 +5,13 @@ import type { ReceivedItem } from '@shared/types'
 import { logger } from './logger'
 
 export type APEvent =
-  | { type: 'connected'; slot: string; players: string[]; slotData: any; seedName: string }
+  | { type: 'connected'; slot: string; players: string[]; playerGames: Record<string, string>; slotData: any; seedName: string }
   | { type: 'disconnected' }
   | { type: 'item'; item: ReceivedItem }
   | { type: 'chat'; who: string; msg: string }
   | { type: 'hint'; finder: string; receiver: string; location: string; item: string; found: boolean }
   | { type: 'locationsChecked'; ids: number[] }
+  | { type: 'scoutComplete'; locationGames: Record<number, string>; locationItemNames: Record<number, string> }
   | { type: 'deathlink'; source: string }
   | { type: 'error'; msg: string }
 
@@ -77,22 +78,31 @@ function createAPSocket() {
         logger.info('[AP] socket connected (authenticated)')
         _connected = true
 
-        const players = (client.players.teams as any[][])
-          .flat()
-          .filter((p: any) => p?.alias)
-          .map((p: any) => p.alias as string)
+        const allPlayers: any[] = (client.players.teams as any[][]).flat().filter((p: any) => p?.alias)
+        const players = allPlayers.map((p: any) => p.alias as string)
+        const playerGames: Record<string, string> = {}
+        for (const p of allPlayers) playerGames[p.alias] = p.game ?? ''
 
         logger.info(`[AP] players in room: ${players.join(', ')}`)
-        emit({ type: 'connected', slot: slotName, players, slotData: packet?.slot_data ?? null, seedName: _seedName })
+        emit({ type: 'connected', slot: slotName, players, playerGames, slotData: packet?.slot_data ?? null, seedName: _seedName })
 
         // Defer one tick: archipelago.js auth flag not set until after this event fires
         setTimeout(() => {
           const missing: number[] = client?.room?.missingLocations ?? []
-          if (missing.length > 0) {
-            client.scout(missing, 0)
+          const checked: number[] = client?.room?.checkedLocations ?? []
+          const allLocIds = [...missing, ...checked]
+          if (allLocIds.length > 0) {
+            client.scout(allLocIds, 0)
               .then((items: any[]) => {
-                _locationFlags = new Map(items.map((i: any) => [i.locationId, i.flags]))
-                logger.info(`[AP] scouted ${items.length} locations for filter flags`)
+                _locationFlags = new Map(items.filter((i: any) => missing.includes(i.locationId)).map((i: any) => [i.locationId, i.flags]))
+                logger.info(`[AP] scouted ${items.length} locations (${missing.length} missing, ${checked.length} checked)`)
+                const locationGames: Record<number, string> = {}
+                const locationItemNames: Record<number, string> = {}
+                for (const i of items) {
+                  locationGames[i.locationId] = i.game ?? ''
+                  locationItemNames[i.locationId] = i.name ?? ''
+                }
+                emit({ type: 'scoutComplete', locationGames, locationItemNames })
               })
               .catch((e: any) => logger.warn('[AP] location scout failed:', e?.message))
           }

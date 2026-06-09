@@ -143,7 +143,7 @@ export function initIpc(): void {
         complete: state.goal?.complete ?? false,
       }
       const totalGearUnlocks: number = gameOpts.total_gear_upgrades ?? 0
-      patch({ connection: 'connected', slotName: ev.slot, goal: goalState, totalGearUnlocks })
+      patch({ connection: 'connected', slotName: ev.slot, goal: goalState, totalGearUnlocks, playerGames: ev.playerGames })
 
       // Defer one tick so archipelago.js finishes populating room.checkedLocations/missingLocations
       setTimeout(() => {
@@ -181,6 +181,14 @@ export function initIpc(): void {
         logger.info('[init] all statuses green — auto-starting monitoring')
         handleAction({ type: 'startMonitoring' }).catch(e => logger.warn('[init] auto-start monitoring failed:', e?.message))
       }
+    }
+    if (ev.type === 'scoutComplete') {
+      state.locations = state.locations.map(l => ({
+        ...l,
+        receiverGame:     ev.locationGames[l.id],
+        receiverItemName: ev.locationItemNames[l.id],
+      }))
+      patch({ locations: state.locations })
     }
     if (ev.type === 'locationsChecked') {
       const checkedSet = new Set(ev.ids)
