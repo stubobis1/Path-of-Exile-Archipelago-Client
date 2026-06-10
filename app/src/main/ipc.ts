@@ -128,7 +128,7 @@ export function initIpc(): void {
       // H-2: prefer server-side poe-uuid over OAuth UUID
       setSettingsContext(ev.seedName, ev.slotData?.['poe-uuid'] ?? settingsService.get().poeUuid ?? '', ev.slot)
       const ws = settingsService.get(...sc())
-      patch({ deathlink: ws.deathlink, whisperUpdates: ws.whisperUpdates })
+      patch({ deathlink: ws.deathlink, whisperUpdates: ws.whisperUpdates, disableGameInput: ws.disableGameInput ?? false })
       _highWaterIndex = Math.max(_highWaterIndex, ws.chatHighWaterIndex ?? -1)
 
       const gameOpts = ev.slotData?.game_options ?? ev.slotData ?? {}

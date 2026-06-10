@@ -158,6 +158,12 @@ export async function handleAction(action: IpcAction): Promise<unknown> {
       return null
     }
 
+    case 'setDisableGameInput': {
+      patch({ disableGameInput: action.enabled })
+      settingsService.set('disableGameInput', action.enabled, ...settingsCtx())
+      return null
+    }
+
     case 'saveSetting': {
       settingsService.set(action.key, action.value as never, ...settingsCtx())
       // Infra keys are global — also write to default so per-world stores stay in sync

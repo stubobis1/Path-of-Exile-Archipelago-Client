@@ -5,6 +5,24 @@ import { ValidationErrors } from '../components/ValidationErrors'
 
 
 
+function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <div onClick={() => onChange(!on)} style={{
+      width: 36, height: 20, borderRadius: 10, cursor: 'pointer', flexShrink: 0,
+      background: on ? 'var(--accent)' : 'var(--bg-3)',
+      border: '1px solid', borderColor: on ? 'var(--accent)' : 'var(--rule-2)',
+      position: 'relative', transition: 'background .15s',
+    }}>
+      <div style={{
+        position: 'absolute', top: 2, left: on ? 17 : 2,
+        width: 14, height: 14, borderRadius: 7,
+        background: on ? '#fff' : 'var(--ink-4)',
+        transition: 'left .15s',
+      }} />
+    </div>
+  )
+}
+
 function StatCard({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
   return (
     <div style={{ padding: '7px 10px', background: 'var(--bg-3)', borderRadius: 5, border: '1px solid var(--rule)' }}>
@@ -161,7 +179,7 @@ function StatusCard({ onNavigate }: { onNavigate: (screen: string, section?: str
 }
 
 function MonitoringCard() {
-  const { clientTxtOk } = useStore()
+  const { clientTxtOk, disableGameInput } = useStore()
   const action = useStore(s => s.action)
 
   const handleRefresh = () => {
@@ -198,6 +216,13 @@ function MonitoringCard() {
             disabled={!clientTxtOk}
             onClick={handleRefresh}
           >↺ Refresh</button>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--rule)' }}>
+          <div>
+            <div style={{ fontSize: 12, color: 'var(--ink-2)' }}>Disable game input</div>
+            <div style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 2 }}>Block all automatic pasting into Path of Exile</div>
+          </div>
+          <Toggle on={disableGameInput} onChange={v => action({ type: 'setDisableGameInput', enabled: v })} />
         </div>
       </div>
     </div>

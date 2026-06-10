@@ -47,6 +47,7 @@ export function SettingsScreen({ scrollTo }: { scrollTo?: string }) {
   }
 
   const [paths, setPaths]           = useState({ clientTxt: '', docPath: '', baseFilter: '' })
+  const [disableGameInput, setDisableGameInput] = useState(false)
   const [whisper, setWhisper]           = useState(true)
   const [goalChatVerify, setGoalChatVerify] = useState(true)
   const [filterDisplay, setFilterDisplay] = useState(0)
@@ -72,6 +73,7 @@ export function SettingsScreen({ scrollTo }: { scrollTo?: string }) {
         baseFilter: s.baseItemFilter  ?? '',
       })
       setFocusMode(s.focusDetectionMode ?? 'os')
+      setDisableGameInput(s.disableGameInput ?? false)
       setWhisper(s.whisperUpdates  ?? true)
       setGoalChatVerify(s.goalChatVerify ?? true)
       setFilterDisplay(s.filterDisplay ?? 0)
@@ -264,6 +266,9 @@ export function SettingsScreen({ scrollTo }: { scrollTo?: string }) {
               </div>
             </Row>
           )}
+          <Row label="Disable game input" note="Block all automatic pasting into Path of Exile — filter reloads, item whispers, commands. Nothing will be sent to the game client.">
+            <Toggle on={disableGameInput} onChange={v => { setDisableGameInput(v); save('disableGameInput')(v) }} />
+          </Row>
           <Row label="Item whispers" note="Show a whisper in-game when you receive a new item.">
             <Toggle on={whisper} onChange={v => { setWhisper(v); action({ type: 'setWhisperUpdates', enabled: v }) }} />
           </Row>

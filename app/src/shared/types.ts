@@ -16,6 +16,7 @@ export interface Settings {
   password:       string
   // Preferences
   whisperUpdates:   boolean
+  disableGameInput: boolean
   goalChatVerify:   boolean
   bypassFocusCheck: boolean
   focusDetectionMode: 'os' | 'clienttxt'
@@ -198,8 +199,9 @@ export interface AppState {
   goal:        GoalState | null
   totalGearUnlocks: number
   errors:      ValidationError[]
-  deathlink:   boolean
-  whisperUpdates: boolean
+  deathlink:        boolean
+  whisperUpdates:   boolean
+  disableGameInput: boolean
   hints:       APHint[]
   locations:   APLocation[]
   playerGames: Record<string, string>
@@ -233,6 +235,7 @@ export type IpcAction =
   | { type: 'sendCommand'; cmd: string }
   | { type: 'setDeathlink'; enabled: boolean }
   | { type: 'setWhisperUpdates'; enabled: boolean }
+  | { type: 'setDisableGameInput'; enabled: boolean }
   | { type: 'saveSetting'; key: keyof Settings; value: unknown }
   | { type: 'handshakeChar'; charName: string }
   | { type: 'onboardingNext' }

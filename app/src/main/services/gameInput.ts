@@ -228,6 +228,10 @@ function startRetryLoop(): void {
  * Fire-and-forget; drops silently when PoE is not in the foreground.
  */
 export async function openChatAndSend(command: string): Promise<boolean> {
+  if (settingsService.get().disableGameInput) {
+    logger.debug('[gameInput] game input disabled — skipping send')
+    return false
+  }
   if (!(await isPoeFocused())) {
     logger.debug('[gameInput] PoE not focused — skipping immediate send')
     return false
@@ -240,6 +244,10 @@ export async function openChatAndSend(command: string): Promise<boolean> {
  * Retries up to `maxTries` times (~30 s by default) before giving up.
  */
 export function queueChatSend(command: string, maxTries = 60): Promise<boolean> {
+  if (settingsService.get().disableGameInput) {
+    logger.debug(`[gameInput] game input disabled — dropping: "${command}"`)
+    return Promise.resolve(false)
+  }
   logger.info(`[gameInput] queued: "${command}" (max ${maxTries} retries)`)
   return new Promise(resolve => {
     if (command.startsWith('/itemfilter')) {
