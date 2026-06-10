@@ -1,6 +1,6 @@
 {
   "name": "poe-archipelago-client",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Path of Exile Archipelago Client",
   "main": "out/main/index.js",
   "author": "StuBob",
@@ -14,6 +14,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "sync-data": "node scripts/sync-data.js",
+    "release": "node scripts/release.js",
     "postinstall": "electron-rebuild -f -w uiohook-napi || true"
   },
   "dependencies": {
