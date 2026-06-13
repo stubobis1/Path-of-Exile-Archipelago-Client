@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { imgOnError } from '../imgError'
 import { ValidationErrors } from '../components/ValidationErrors'
 import { useStore } from '../store'
-import type { ReceivedItem, APHint, APLocation } from '@shared/types'
+import type { ReceivedItem, APItem, APHint, APLocation } from '@shared/types'
 import { initGemTooltips, preloadGems, showGemTooltip, hideGemTooltip, moveGemTooltip, getGemTags } from '../services/gemTooltip'
 import { PaperDoll } from '../components/PaperDoll'
 import { HintedItems } from '../components/HintedItems'
@@ -34,7 +34,7 @@ function imgUrl(name: string) {
 
 const GEM_MODIFIERS = ['Vaal Gems', 'Alternate Gems']
 
-function categorizeItem(item: ReceivedItem): string {
+function categorizeItem(item: APItem): string {
   const cats = item.category ?? []
   if (cats.includes('Level') || cats.includes('max links')) return 'Progression'
   if (cats[0] === 'Flask') return 'Flasks'
@@ -78,14 +78,14 @@ function GemModifiersSection({ receivedNames }: { receivedNames: Set<string> }) 
   )
 }
 
-function ItemTag({ name, count, css, isGem, levelReq }: { name: string; count: number; css: string; isGem?: boolean; levelReq?: number }) {
+function ItemTag({ name, count, css, isGem, levelReq, dimmed }: { name: string; count: number; css: string; isGem?: boolean; levelReq?: number; dimmed?: boolean }) {
   const handlers = isGem ? {
     onMouseEnter: (e: React.MouseEvent) => showGemTooltip(e.nativeEvent, name),
     onMouseLeave: () => hideGemTooltip(),
     onMouseMove:  (e: React.MouseEvent) => moveGemTooltip(e.nativeEvent),
   } : {}
   return (
-    <span className={`item-tag ${css}`} style={isGem ? { cursor: 'default' } : undefined} {...handlers}>
+    <span className={`item-tag ${css}`} style={{ ...(isGem ? { cursor: 'default' } : undefined), ...(dimmed ? { opacity: 0.35, filter: 'grayscale(1)' } : undefined) }} {...handlers}>
       <img className="item-img" src={imgUrl(name)} alt=""
         onError={imgOnError} />
       {name}
@@ -99,11 +99,12 @@ const GEM_CATS = new Set(['Skill Gems', 'Support Gems', 'Utility Gems'])
 
 type GemSort = 'alpha' | 'level'
 
-function CatSection({ cat, entries, gemSort, gemLevelReq }: {
+function CatSection({ cat, entries, gemSort, gemLevelReq, unreceivedEntries }: {
   cat: string
   entries: [string, number][]
   gemSort?: GemSort
   gemLevelReq?: Map<string, number>
+  unreceivedEntries?: string[]
 }) {
   const [collapsed, setCollapsed] = useState(false)
   const css   = CAT_CSS[cat] ?? ''
@@ -131,6 +132,9 @@ function CatSection({ cat, entries, gemSort, gemLevelReq }: {
           {sorted.map(([name, count]) => (
             <ItemTag key={name} name={name} count={count} css={css} isGem={isGem}
               levelReq={isGem && gemSort === 'level' ? gemLevelReq?.get(name) : undefined} />
+          ))}
+          {unreceivedEntries?.map(name => (
+            <ItemTag key={`u_${name}`} name={name} count={1} css={css} isGem={isGem} dimmed />
           ))}
         </div>
       )}
@@ -191,6 +195,14 @@ export function ItemsScreen() {
   const { items, hints, char, locations, slotName, connection } = useStore()
   const [search, setSearch] = useState('')
   const [gemSort, setGemSort] = useState<GemSort>('alpha')
+  const [catalog, setCatalog] = useState<APItem[]>([])
+
+  useEffect(() => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('GET', 'ap-assets:///data/Items.json')
+    xhr.onload = () => { try { setCatalog(JSON.parse(xhr.responseText)) } catch {} }
+    xhr.send()
+  }, [])
   // Built from store items (reqLevel enriched by main process) rather than a
   // separate ap-assets fetch, so it's always in sync and never races with render.
   const gemLevelReq = React.useMemo(() => {
@@ -254,6 +266,25 @@ export function ItemsScreen() {
     const cat = categorizeItem(item)
     if (!grouped[cat]) grouped[cat] = {}
     grouped[cat][item.name] = (grouped[cat][item.name] || 0) + 1
+  }
+
+  const groupedUnreceived: Record<string, string[]> = {}
+  if (searchLower && catalog.length) {
+    for (const cat of CAT_ORDER) groupedUnreceived[cat] = []
+    const seen = new Set<string>()
+    for (const item of catalog) {
+      if (allReceivedNames.has(item.name)) continue
+      if (seen.has(item.name)) continue
+      const cats = item.category ?? []
+      if (cats.includes('Base Class') || cats.includes('Ascendancy') || cats[0] === 'GemModifier') continue
+      if (!item.name.toLowerCase().includes(searchLower) &&
+          !(GEM_CATS.has(categorizeItem(item)) && getGemTags(item.name).includes(searchLower))) continue
+      const cat = categorizeItem(item)
+      if (CAT_ORDER.includes(cat)) {
+        groupedUnreceived[cat].push(item.name)
+        seen.add(item.name)
+      }
+    }
   }
 
   return (
@@ -324,9 +355,12 @@ export function ItemsScreen() {
         {/* Item categories */}
         {CAT_ORDER.map(cat => {
           const entries = Object.entries(grouped[cat] ?? {}).sort((a, b) => a[0].localeCompare(b[0]))
+          const unreceived = groupedUnreceived[cat] ?? []
           return (
             <React.Fragment key={cat}>
-              {entries.length > 0 && <CatSection cat={cat} entries={entries} gemSort={gemSort} gemLevelReq={gemLevelReq} />}
+              {(entries.length > 0 || unreceived.length > 0) && (
+                <CatSection cat={cat} entries={entries} gemSort={gemSort} gemLevelReq={gemLevelReq} unreceivedEntries={unreceived.length > 0 ? unreceived : undefined} />
+              )}
               {cat === 'Utility Gems' && items.length > 0 && <GemModifiersSection receivedNames={allReceivedNames} />}
             </React.Fragment>
           )
