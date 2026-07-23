@@ -16,7 +16,10 @@ vi.mock('../main/data', () => ({
 
 describe('checkGoalZone', () => {
   it('returns true for the correct completion zone', () => {
-    expect(checkGoalZone(1, 'Southern Forest')).toBe(true)
+    // Zone names must match Client.txt exactly, including "The " where the
+    // game's own AreaLocations.json data has it (confirmed against
+    // resources/data/AreaLocations.json: "The Southern Forest", not "Southern Forest").
+    expect(checkGoalZone(1, 'The Southern Forest')).toBe(true)
     expect(checkGoalZone(0, 'Karui Shores')).toBe(true)
     expect(checkGoalZone(9, 'Oriath Docks')).toBe(true)
   })
