@@ -256,3 +256,7 @@ export type IpcAction =
   | { type: 'requestFullState' }
   | { type: 'sendGoal' }
   | { type: 'checkXdotool' }
+  // E2E-test-only: patches AppState directly, bypassing the AP/GGG network
+  // layer, so Playwright can render "connected" screens without a real
+  // server. No-ops unless the app was launched with E2E_TEST=1.
+  | { type: 'debugSetState'; delta: Partial<AppState> }

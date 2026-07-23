@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { imgOnError } from '../imgError'
 import { resolveGameIconFolder } from '../gameIconMap'
 import type { APHint, APLocation, ReceivedItem } from '@shared/types'
 import { useStore } from '../store'
@@ -19,6 +18,10 @@ function gameImgUrl(game: string, item: string): string {
   return `${ICONS_BASE}/${g}/${g}_${slug}.png`
 }
 
+// Hints mix icons from many other-game asset packs, most of which don't cover
+// every item — falling back to the shared placeholder.png here would paper
+// over that with a misleading generic icon on nearly every row. Just collapse
+// to blank space instead once every real source has failed.
 function OtherGameIcon({ game, item, size }: { game: string; item: string; size: number }) {
   const [fallback, setFallback] = useState(false)
   const [hide, setHide] = useState(false)
@@ -31,14 +34,16 @@ function OtherGameIcon({ game, item, size }: { game: string; item: string; size:
       src={fallback ? gameIcon : gameImgUrl(game, item)}
       alt=""
       style={{ width: size, height: size, objectFit: 'contain', flexShrink: 0 }}
-      onError={fallback ? imgOnError : () => setFallback(true)}
+      onError={fallback ? () => setHide(true) : () => setFallback(true)}
     />
   )
 }
 
 function ItemIcon({ item, game, slotName, size }: { item: string; game: string | undefined; slotName: string; size: number }) {
+  const [hide, setHide] = useState(false)
   if (!game || game === 'Path of Exile') {
-    return <img src={poeImgUrl(item)} alt="" style={{ width: size, height: size, objectFit: 'contain', flexShrink: 0 }} onError={imgOnError} />
+    if (hide) return <span style={{ width: size, height: size, display: 'inline-block' }} />
+    return <img src={poeImgUrl(item)} alt="" style={{ width: size, height: size, objectFit: 'contain', flexShrink: 0 }} onError={() => setHide(true)} />
   }
   return <OtherGameIcon game={game} item={item} size={size} />
 }
@@ -133,7 +138,7 @@ function HintComboBox({ value, onChange, items: names, disabled }: { value: stri
                 color: i === activeIdx ? 'var(--ink)' : 'var(--ink-2)',
               }}>
               <img src={poeImgUrl(n)} alt="" style={{ width: 22, height: 22, objectFit: 'contain', flexShrink: 0 }}
-                onError={imgOnError} />
+                onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
               <span className="mono">{n}</span>
             </li>
           ))}

@@ -333,6 +333,11 @@ export async function handleAction(action: IpcAction): Promise<unknown> {
       return null
     }
 
+    case 'debugSetState': {
+      if (process.env.E2E_TEST === '1') patch(action.delta)
+      return null
+    }
+
     case 'browsePath': {
       const win = BrowserWindow.getFocusedWindow()
       if (!win) return null

@@ -24,6 +24,11 @@ function createAPSocket() {
   let _slot         = ''
   let _seedName     = ''
   let _locationFlags = new Map<number, number>()
+  // Bumped on every connect() call; lets stale closures from a superseded
+  // connection detect they're stale and no-op instead of acting on a
+  // newer, unrelated client (see plan-2.2.0.md item #2).
+  let _connectToken = 0
+  let _connecting: Promise<void> | null = null
 
   const emit = (ev: APEvent) => listeners.forEach(l => l(ev))
 
@@ -38,136 +43,167 @@ function createAPSocket() {
 
     /** Connect to an Archipelago server and authenticate as the given slot. */
     async connect(addr: string, slotName: string, password: string, _deathlink = false, game = 'Path of Exile'): Promise<void> {
-      await this.disconnect()
+      // Reentrancy guard: if a connect() is already in flight (e.g. auto-connect
+      // racing a manual connect), wait for it to settle before starting a new one
+      // rather than letting two connect() calls build sockets concurrently.
+      while (_connecting) {
+        await _connecting.catch(() => {})
+      }
 
-      logger.info(`[AP] Connecting to ${addr} as "${slotName}" (game: ${game})`)
+      const run = (async () => {
+        await this.disconnect()
 
-      const { Client, itemsHandlingFlags } = await import('archipelago.js')
-      client = new Client({ timeout: 30000 })
-      _slot  = slotName
+        const myToken = ++_connectToken
+        // Stale check: true once a later connect() call has superseded this one.
+        const stale = () => myToken !== _connectToken
 
-      client.socket.on('roomInfo', () => {
-        logger.info('[AP] RoomInfo received -- sending Connect packet')
-      })
+        logger.info(`[AP] Connecting to ${addr} as "${slotName}" (game: ${game})`)
 
-      client.socket.on('sentPackets', (pkts: any[]) => {
-        for (const p of pkts) {
-          if (p?.cmd === 'Connect') logger.info('[AP] Connect packet sent:', JSON.stringify(p))
-        }
-      })
+        const { Client, itemsHandlingFlags } = await import('archipelago.js')
+        // Local const so every closure below closes over THIS connection's client,
+        // never the shared mutable `client` variable a later connect() reassigns.
+        const myClient = new Client({ timeout: 30000 })
+        client = myClient
+        _slot  = slotName
 
-      client.socket.on('receivedPacket', (pkt: any) => {
-        logger.debug('[AP] packet:', pkt?.cmd)
-        if (pkt?.cmd === 'RoomInfo') _seedName = pkt.seed_name ?? ''
-      })
-
-      // Use the built-in DeathLinkManager: handles self-filter via timestamp dedup,
-      // tag registration, and bounce routing — don't intercept raw Bounced packets.
-      client.deathLink.on('deathReceived', (source: string, _time: number, _cause: string) => {
-        logger.info('[AP] DeathLink received from', source)
-        emit({ type: 'deathlink', source })
-      })
-
-      client.socket.on('invalidPacket', (pkt: any) => {
-        logger.error('[AP] InvalidPacket:', JSON.stringify(pkt))
-      })
-
-      // `connected` fires before `receivedPacket` for the Connected packet, so read
-      // slot_data directly from the packet arg rather than caching it in receivedPacket.
-      client.socket.on('connected', (packet: any) => {
-        logger.info('[AP] socket connected (authenticated)')
-        _connected = true
-
-        const allPlayers: any[] = (client.players.teams as any[][]).flat().filter((p: any) => p?.alias)
-        const players = allPlayers.map((p: any) => p.alias as string)
-        const playerGames: Record<string, string> = {}
-        for (const p of allPlayers) playerGames[p.alias] = p.game ?? ''
-
-        logger.info(`[AP] players in room: ${players.join(', ')}`)
-        emit({ type: 'connected', slot: slotName, players, playerGames, slotData: packet?.slot_data ?? null, seedName: _seedName })
-
-        // Defer one tick: archipelago.js auth flag not set until after this event fires
-        setTimeout(() => {
-          const missing: number[] = client?.room?.missingLocations ?? []
-          const checked: number[] = client?.room?.checkedLocations ?? []
-          const allLocIds = [...missing, ...checked]
-          if (allLocIds.length > 0) {
-            client.scout(allLocIds, 0)
-              .then((items: any[]) => {
-                _locationFlags = new Map(items.filter((i: any) => missing.includes(i.locationId)).map((i: any) => [i.locationId, i.flags]))
-                logger.info(`[AP] scouted ${items.length} locations (${missing.length} missing, ${checked.length} checked)`)
-                const locationGames: Record<number, string> = {}
-                const locationItemNames: Record<number, string> = {}
-                for (const i of items) {
-                  locationGames[i.locationId] = i.game ?? ''
-                  locationItemNames[i.locationId] = i.name ?? ''
-                }
-                emit({ type: 'scoutComplete', locationGames, locationItemNames })
-              })
-              .catch((e: any) => logger.warn('[AP] location scout failed:', e?.message))
-          }
-        }, 0)
-      })
-
-      client.socket.on('disconnected', () => {
-        logger.info('[AP] socket disconnected')
-        _connected = false
-        emit({ type: 'disconnected' })
-      })
-
-      client.socket.on('connectionRefused', (pkt: any) => {
-        logger.error('[AP] connection refused:', JSON.stringify(pkt?.errors))
-      })
-
-      client.room.on('locationsChecked', (ids: number[]) => {
-        emit({ type: 'locationsChecked', ids })
-      })
-
-      client.items.on('itemsReceived', (items: any[], startingIndex: number) => {
-        logger.info(`[AP] received ${items.length} item(s) starting at index ${startingIndex}`)
-        for (let i = 0; i < items.length; i++) {
-          const item = items[i]
-          emit({
-            type: 'item',
-            item: {
-              id:             item.id,
-              name:           item.name,
-              classification: '',
-              category:       [],
-              from:           item.sender?.alias ?? 'Unknown',
-              index:          startingIndex + i,
-            },
-          })
-        }
-      })
-
-      client.messages.on('message', (text: string) => {
-        if (text) emit({ type: 'chat', who: '', msg: text })
-      })
-
-      try {
-        const emitHint = (h: any) => emit({
-          type:     'hint',
-          finder:   h.item?.sender?.alias ?? h.findingPlayer?.alias ?? h.finding_player ?? '',
-          receiver: h.item?.receiver?.alias ?? h.receivingPlayer?.alias ?? h.receiving_player ?? '',
-          location: h.item?.locationName ?? h.locationName ?? h.location_name ?? '',
-          item:     h.item?.name ?? h.itemName ?? h.item_name ?? '',
-          found:    h.found ?? h.item?.found ?? false,
+        myClient.socket.on('roomInfo', () => {
+          logger.info('[AP] RoomInfo received -- sending Connect packet')
         })
-        if (client.items?.on) {
-          client.items.on('hintsInitialized', (hints: any[]) => hints.forEach(emitHint))
-          client.items.on('hintReceived',     emitHint)
-        }
-      } catch { /* hints API unavailable */ }
 
-      logger.info(`[AP] calling login(${addr}, ${slotName}, ${game})`)
-      await client.login(addr, slotName, game, {
-        password: password ?? '',
-        items:    itemsHandlingFlags.all,
-        // Always register DeathLink so we receive bounces; ipc layer gates behaviour on settings.
-        tags:     ['AP', 'DeathLink'],
-      })
-      logger.info('[AP] login() resolved successfully')
+        myClient.socket.on('sentPackets', (pkts: any[]) => {
+          for (const p of pkts) {
+            if (p?.cmd === 'Connect') logger.info('[AP] Connect packet sent:', JSON.stringify(p))
+          }
+        })
+
+        myClient.socket.on('receivedPacket', (pkt: any) => {
+          if (stale()) return
+          logger.debug('[AP] packet:', pkt?.cmd)
+          if (pkt?.cmd === 'RoomInfo') _seedName = pkt.seed_name ?? ''
+        })
+
+        // Use the built-in DeathLinkManager: handles self-filter via timestamp dedup,
+        // tag registration, and bounce routing — don't intercept raw Bounced packets.
+        myClient.deathLink.on('deathReceived', (source: string, _time: number, _cause?: string) => {
+          if (stale()) return
+          logger.info('[AP] DeathLink received from', source)
+          emit({ type: 'deathlink', source })
+        })
+
+        myClient.socket.on('invalidPacket', (pkt: any) => {
+          logger.error('[AP] InvalidPacket:', JSON.stringify(pkt))
+        })
+
+        // `connected` fires before `receivedPacket` for the Connected packet, so read
+        // slot_data directly from the packet arg rather than caching it in receivedPacket.
+        myClient.socket.on('connected', (packet: any) => {
+          if (stale()) return
+          logger.info('[AP] socket connected (authenticated)')
+          _connected = true
+
+          const allPlayers: any[] = (myClient.players.teams as any[][]).flat().filter((p: any) => p?.alias)
+          const players = allPlayers.map((p: any) => p.alias as string)
+          const playerGames: Record<string, string> = {}
+          for (const p of allPlayers) playerGames[p.alias] = p.game ?? ''
+
+          logger.info(`[AP] players in room: ${players.join(', ')}`)
+          emit({ type: 'connected', slot: slotName, players, playerGames, slotData: packet?.slot_data ?? null, seedName: _seedName })
+
+          // Defer one tick: archipelago.js auth flag not set until after this event fires
+          setTimeout(() => {
+            if (stale()) return
+            const missing: number[] = myClient?.room?.missingLocations ?? []
+            const checked: number[] = myClient?.room?.checkedLocations ?? []
+            const allLocIds = [...missing, ...checked]
+            if (allLocIds.length > 0) {
+              myClient.scout(allLocIds, 0)
+                .then((items: any[]) => {
+                  if (stale()) return
+                  _locationFlags = new Map(items.filter((i: any) => missing.includes(i.locationId)).map((i: any) => [i.locationId, i.flags]))
+                  logger.info(`[AP] scouted ${items.length} locations (${missing.length} missing, ${checked.length} checked)`)
+                  const locationGames: Record<number, string> = {}
+                  const locationItemNames: Record<number, string> = {}
+                  for (const i of items) {
+                    locationGames[i.locationId] = i.game ?? ''
+                    locationItemNames[i.locationId] = i.name ?? ''
+                  }
+                  emit({ type: 'scoutComplete', locationGames, locationItemNames })
+                })
+                .catch((e: any) => logger.warn('[AP] location scout failed:', e?.message))
+            }
+          }, 0)
+        })
+
+        myClient.socket.on('disconnected', () => {
+          if (stale()) return
+          logger.info('[AP] socket disconnected')
+          _connected = false
+          emit({ type: 'disconnected' })
+        })
+
+        myClient.socket.on('connectionRefused', (pkt: any) => {
+          logger.error('[AP] connection refused:', JSON.stringify(pkt?.errors))
+        })
+
+        myClient.room.on('locationsChecked', (ids: number[]) => {
+          if (stale()) return
+          emit({ type: 'locationsChecked', ids })
+        })
+
+        myClient.items.on('itemsReceived', (items: any[], startingIndex: number) => {
+          if (stale()) return
+          logger.info(`[AP] received ${items.length} item(s) starting at index ${startingIndex}`)
+          for (let i = 0; i < items.length; i++) {
+            const item = items[i]
+            emit({
+              type: 'item',
+              item: {
+                id:             item.id,
+                name:           item.name,
+                classification: '',
+                category:       [],
+                from:           item.sender?.alias ?? 'Unknown',
+                index:          startingIndex + i,
+              },
+            })
+          }
+        })
+
+        myClient.messages.on('message', (text: string) => {
+          if (stale()) return
+          if (text) emit({ type: 'chat', who: '', msg: text })
+        })
+
+        try {
+          const emitHint = (h: any) => {
+            if (stale()) return
+            emit({
+              type:     'hint',
+              finder:   h.item?.sender?.alias ?? h.findingPlayer?.alias ?? h.finding_player ?? '',
+              receiver: h.item?.receiver?.alias ?? h.receivingPlayer?.alias ?? h.receiving_player ?? '',
+              location: h.item?.locationName ?? h.locationName ?? h.location_name ?? '',
+              item:     h.item?.name ?? h.itemName ?? h.item_name ?? '',
+              found:    h.found ?? h.item?.found ?? false,
+            })
+          }
+          if (myClient.items?.on) {
+            myClient.items.on('hintsInitialized', (hints: any[]) => hints.forEach(emitHint))
+            myClient.items.on('hintReceived',     emitHint)
+          }
+        } catch { /* hints API unavailable */ }
+
+        logger.info(`[AP] calling login(${addr}, ${slotName}, ${game})`)
+        await myClient.login(addr, slotName, game, {
+          password: password ?? '',
+          items:    itemsHandlingFlags.all,
+          // Always register DeathLink so we receive bounces; ipc layer gates behaviour on settings.
+          tags:     ['AP', 'DeathLink'],
+        })
+        logger.info('[AP] login() resolved successfully')
+      })()
+
+      _connecting = run.finally(() => { _connecting = null })
+      await _connecting
     },
 
     /** Disconnect and reset state. */

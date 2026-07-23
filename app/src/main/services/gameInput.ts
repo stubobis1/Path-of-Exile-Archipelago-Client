@@ -221,11 +221,35 @@ function startRetryLoop(): void {
   retryTimer = setInterval(() => { tryFlushQueue().catch(() => {}) }, 500)
 }
 
+// `sendImmediate` touches the shared OS clipboard and is only ever safe to run
+// one-at-a-time. `tryFlushQueue`'s `retryRunning` flag is the single mutex for
+// that — so every caller (immediate sends included) must go through the queue
+// instead of calling `sendImmediate` directly, or two callers' clipboard
+// save/restore transactions can interleave.
+function enqueue(command: string, maxTries: number, front: boolean): Promise<boolean> {
+  return new Promise(resolve => {
+    if (command.startsWith('/itemfilter')) {
+      // Drop older /itemfilter entries; only most-recent matters
+      const dropped = queue.filter(i => i.command.startsWith('/itemfilter'))
+      dropped.forEach(i => i.resolve(false))
+      const keep = queue.filter(i => !i.command.startsWith('/itemfilter'))
+      queue.length = 0
+      queue.push(...keep)
+    }
+    const item: QueueItem = { command, maxTries, tries: 0, resolve }
+    if (front) queue.unshift(item)
+    else queue.push(item)
+    startRetryLoop()
+    tryFlushQueue().catch(() => {})
+  })
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 /**
- * Send a command immediately if PoE is currently focused.
- * Fire-and-forget; drops silently when PoE is not in the foreground.
+ * Send a command as soon as the clipboard mutex is free, jumping ahead of any
+ * queued commands. Drops silently (no retry) when PoE isn't focused or the
+ * in-flight send fails.
  */
 export async function openChatAndSend(command: string): Promise<boolean> {
   if (settingsService.get().disableGameInput) {
@@ -236,7 +260,7 @@ export async function openChatAndSend(command: string): Promise<boolean> {
     logger.debug('[gameInput] PoE not focused — skipping immediate send')
     return false
   }
-  return sendImmediate(command)
+  return enqueue(command, 0, true)
 }
 
 /**
@@ -249,19 +273,7 @@ export function queueChatSend(command: string, maxTries = 60): Promise<boolean> 
     return Promise.resolve(false)
   }
   logger.info(`[gameInput] queued: "${command}" (max ${maxTries} retries)`)
-  return new Promise(resolve => {
-    if (command.startsWith('/itemfilter')) {
-      // Drop older /itemfilter entries; only most-recent matters
-      const dropped = queue.filter(i => i.command.startsWith('/itemfilter'))
-      dropped.forEach(i => i.resolve(false))
-      const keep = queue.filter(i => !i.command.startsWith('/itemfilter'))
-      queue.length = 0
-      queue.push(...keep)
-    }
-    queue.push({ command, maxTries, tries: 0, resolve })
-    startRetryLoop()
-    tryFlushQueue().catch(() => {})
-  })
+  return enqueue(command, maxTries, false)
 }
 
 /** @deprecated Use `openChatAndSend` directly. */

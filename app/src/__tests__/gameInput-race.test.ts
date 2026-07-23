@@ -5,34 +5,30 @@ import { clipboard } from 'electron'
  * Reproduction for plan-2.2.0.md P1 #4: "Whisper/clipboard hijack — random
  * clipboard contents get pasted into game chat on zone transition".
  *
- * Root cause: `openChatAndSend()` (used for the immediate zone-transition
- * whisper) calls `sendImmediate()` directly, completely bypassing the
+ * Root cause was `openChatAndSend()` (used for the immediate zone-transition
+ * whisper) calling `sendImmediate()` directly, completely bypassing the
  * `queue`/`tryFlushQueue`/`retryRunning` serialization that `queueChatSend()`
- * goes through. `sendImmediate()` itself has no mutex either — it's a plain
+ * goes through. `sendImmediate()` itself had no mutex either — it's a plain
  * read-original -> write-command -> simulate-paste -> restore-original
- * transaction. The only guard is a time-based debounce (`lastSendMs`), which
- * only rejects a second call that starts *very soon* after the first — it
- * does NOT prevent overlap when the first call's actual transaction (spawn a
- * PowerShell/xdotool process, wait configured delays) takes *longer* than
- * the debounce window, which easily happens with realistic delay settings.
+ * transaction. The only guard was a time-based debounce (`lastSendMs`), which
+ * only rejects a second call that starts *very soon* after the first — it did
+ * NOT prevent overlap when the first call's actual transaction (spawn a
+ * PowerShell/xdotool process, wait configured delays) took *longer* than the
+ * debounce window, which easily happens with realistic delay settings.
  *
- * This test simulates exactly that: a queued command (A, e.g. an
- * `/itemfilter` update) starts, and — after the debounce window has elapsed
- * but while A's own external-process call is still pending — a second,
- * unrelated immediate send (B, e.g. the zone-transition whisper) fires.
- * Because both transactions share the OS clipboard with no cross-call lock:
+ * Fix: `openChatAndSend` no longer calls `sendImmediate` directly — it now
+ * enqueues (at the front of the queue, so it's still "next to send") through
+ * the same `tryFlushQueue`/`retryRunning` mutex that `queueChatSend` uses.
+ * `sendImmediate` now has exactly one call site, so only one clipboard
+ * save/write/paste/restore transaction can ever be in flight at a time.
  *
- *   1. B's "read the current clipboard so I can restore it later" step
- *      captures A's in-flight command text, not the player's real clipboard
- *      content.
- *   2. When everything settles, the player's real clipboard content has been
- *      silently replaced by leftover internal command text instead of being
- *      restored — the same missing-mutex defect that, in the real client
- *      (running the actual Ctrl+V paste against the live game window),
- *      manifests as the *reverse* direction: the player's real clipboard
- *      (e.g. a YouTube link) gets pasted into game chat instead of the
- *      intended command, because one call's restore lands in the middle of
- *      the other call's write-then-paste window.
+ * This test simulates the scenario from the bug reports: a queued command
+ * (A, e.g. an `/itemfilter` update) starts, and — after the debounce window
+ * has elapsed but while A's own external-process call is still pending — a
+ * second, unrelated immediate send (B, e.g. the zone-transition whisper)
+ * fires. With the fix, B must wait behind A's mutex rather than reading the
+ * clipboard mid-transaction, so the player's real clipboard content is
+ * correctly captured and restored once both settle.
  */
 
 const TRUE_ORIGINAL = 'https://youtu.be/totally-real-clipboard-content'
@@ -94,7 +90,7 @@ async function freshGameInput() {
 }
 
 describe('gameInput clipboard-transaction race (openChatAndSend vs queued send)', () => {
-  it('BUG: an immediate send started after the debounce window, while a queued send is still mid-flight, captures the OTHER call\'s in-flight command as its "original clipboard" instead of the player\'s real clipboard content', async () => {
+  it('an immediate send started while a queued send is mid-flight waits for the mutex instead of interleaving clipboard access', async () => {
     const mod = await freshGameInput()
 
     // A: queued command (e.g. an /itemfilter update fired on zone transition).
@@ -118,19 +114,18 @@ describe('gameInput clipboard-transaction race (openChatAndSend vs queued send)'
     const pB = mod.openChatAndSend('Archipoelago Client')
     await vi.advanceTimersByTimeAsync(1)
 
-    // BUG: B's captured "original clipboard to restore later" is A's
-    // in-flight command text, not the player's real clipboard content.
-    const bCapturedPrev = readLog[readsBeforeB]
-    expect(bCapturedPrev).toBe(TRUE_ORIGINAL) // currently FAILS — it's actually '/itemfilter __ap'
+    // B must not have touched the clipboard yet — it's queued at the front,
+    // waiting behind A's mutex (retryRunning), not racing A's transaction.
+    expect(readLog.length).toBe(readsBeforeB)
 
-    // Let everything finish.
+    // Let A's transaction finish; B is then free to run and should capture
+    // the player's real clipboard content, not A's in-flight command text.
     await vi.runAllTimersAsync()
     await Promise.allSettled([pA, pB])
 
-    // BUG: after both transactions settle, the player's real clipboard
-    // content should have been restored — instead it's been permanently
-    // replaced by leftover internal command text, because B's "restore"
-    // step wrote back the corrupted value it captured in step above.
-    expect(clipboardValue).toBe(TRUE_ORIGINAL) // currently FAILS
+    expect(readLog.slice(readsBeforeB)).toContain(TRUE_ORIGINAL)
+    // The player's real clipboard content must end up restored, never
+    // permanently replaced by leftover internal command text.
+    expect(clipboardValue).toBe(TRUE_ORIGINAL)
   })
 })
