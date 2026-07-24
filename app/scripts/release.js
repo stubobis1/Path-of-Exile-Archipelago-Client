@@ -133,15 +133,30 @@ function ask(question) {
     }
   }
 
-  // 8 ── output artifact paths
+  // 8 ── collect all outputs into one directory
   const distFiles = fs.existsSync(distDir)
     ? fs.readdirSync(distDir)
         .filter(f => f.endsWith('.exe') || f.endsWith('.AppImage') || f.endsWith('.deb'))
         .map(f => path.join(distDir, f))
     : []
 
+  const outDir = path.join(AP_ROOT, 'release-output', `v${newVersion}`)
+  fs.mkdirSync(outDir, { recursive: true })
+
+  const collected = []
+  if (fs.existsSync(PATHS.apworldOut)) {
+    const dest = path.join(outDir, path.basename(PATHS.apworldOut))
+    fs.copyFileSync(PATHS.apworldOut, dest)
+    collected.push(dest)
+  }
+  for (const f of distFiles) {
+    const dest = path.join(outDir, path.basename(f))
+    fs.copyFileSync(f, dest)
+    collected.push(dest)
+  }
+
   console.log('\n════════════════════════════════════════════════')
-  console.log(`  apworld:  ${PATHS.apworldOut}`)
-  for (const f of distFiles) console.log(`  client:   ${f}`)
+  console.log(`  output dir: ${outDir}`)
+  for (const f of collected) console.log(`  •  ${path.basename(f)}`)
   console.log('════════════════════════════════════════════════\n')
 })()
