@@ -1,17 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useStore } from '../store'
+import poeOptionsJson from '../../data/poe_options.json'
 
 type CharEntry = { name: string; class: string; level: number; league: string }
 
-const CLASS_TREE: { base: string; ascendancies: string[] }[] = [
-  { base: 'Marauder', ascendancies: ['Berserker', 'Chieftain', 'Juggernaut'] },
-  { base: 'Duelist',  ascendancies: ['Champion', 'Gladiator', 'Slayer'] },
-  { base: 'Ranger',   ascendancies: ['Deadeye', 'Pathfinder', 'Warden'] },
-  { base: 'Shadow',   ascendancies: ['Assassin', 'Saboteur', 'Trickster'] },
-  { base: 'Witch',    ascendancies: ['Elementalist', 'Necromancer', 'Occultist'] },
-  { base: 'Templar',  ascendancies: ['Guardian', 'Hierophant', 'Inquisitor'] },
-  { base: 'Scion',    ascendancies: ['Ascendant', 'Reliquarian'] },
-]
+const CLASS_TREE: { base: string; ascendancies: string[] }[] =
+  (poeOptionsJson as { class_tree: { base: string; ascendancies: string[] }[] }).class_tree
 
 function UnlockDot({ unlocked }: { unlocked: boolean }) {
   return (

@@ -8,6 +8,7 @@ interface Store extends AppState {
 
 const INITIAL: AppState = {
   connection:      'disconnected',
+  connectionError: null,
   serverAddr:      '',
   slotName:        '',
   oauthStatus:     'none',

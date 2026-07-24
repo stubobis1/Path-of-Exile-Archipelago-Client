@@ -39,7 +39,7 @@ function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void 
 
 export function SettingsScreen({ scrollTo }: { scrollTo?: string }) {
   const action = useStore(s => s.action)
-  const { oauthStatus, oauthDaysLeft, oauthAccount, connection, deathlink } = useStore()
+  const { oauthStatus, oauthDaysLeft, oauthAccount, connection, connectionError, deathlink } = useStore()
   const [charOpen, setCharOpen] = useState(false)
 
   const save = (key: keyof Settings) => (value: unknown) => {
@@ -171,13 +171,21 @@ export function SettingsScreen({ scrollTo }: { scrollTo?: string }) {
                 />
               </Row>
               <Row label="Connect" note="Connect to the Archipelago server.">
-                <button
-                  className="btn primary"
-                  disabled={!apAddr || !apSlot || connecting}
-                  onClick={() => action({ type: 'connect', addr: apAddr, slot: apSlot, password: apPass })}
-                >
-                  {connecting ? 'Connecting…' : 'Connect'}
-                </button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'start' }}>
+                  <button
+                    className="btn primary"
+                    disabled={!apAddr || !apSlot || connecting}
+                    onClick={() => action({ type: 'connect', addr: apAddr, slot: apSlot, password: apPass })}
+                  >
+                    {connecting ? 'Connecting…' : 'Connect'}
+                  </button>
+                  {connection === 'error' && connectionError && (
+                    <span className="pill" style={{ color: 'var(--err)' }}>
+                      <span className="dot" />
+                      {connectionError}
+                    </span>
+                  )}
+                </div>
               </Row>
             </>
           )}

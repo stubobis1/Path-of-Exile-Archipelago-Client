@@ -269,7 +269,7 @@ details:not([open]) .details-arrow { transform: rotate(-90deg); }
 .class-card.search-match  { border-color: #c8a830; color: #f0d060; background: #2a2000; box-shadow: 0 0 0 2px #c8a830, 0 0 10px 2px #c8a83060; }
 .item-tag { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.15rem 0.4rem 0.15rem 0.2rem; font-size: 0.78rem; background: var(--bg-3); border: 1px solid var(--rule); border-radius: 2px; color: var(--ink); }
 .item-img { width: 22px; height: 22px; object-fit: contain; flex-shrink: 0; }
-.item-tag:not(.gem):not(.support):not(.util) .item-img { width: 44px; height: 44px; }
+.item-tag:not(.gem):not(.support):not(.util):not(.exceptional) .item-img { width: 44px; height: 44px; }
 .item-tag .item-count { background: var(--bg-2); color: var(--accent); font-family: var(--mono); font-size: 0.68rem; padding: 0 0.3rem; border-radius: 8px; }
 .item-tag .item-level { background: var(--bg-2); color: var(--ink-3); font-family: var(--mono); font-size: 0.65rem; padding: 0 0.25rem; border-radius: 8px; margin-left: 0.1rem; }
 .sort-btn { background: var(--panel-2); border: 1px solid var(--rule-2); color: var(--ink-3); font-family: var(--sans); font-size: 11px; padding: 3px 8px; cursor: pointer; border-radius: 3px; transition: border-color 0.15s, color 0.15s; }
@@ -278,6 +278,7 @@ details:not([open]) .details-arrow { transform: rotate(-90deg); }
 .item-tag.gem     { border-color: #2a5a2a; color: #a5f3a5; }
 .item-tag.support { border-color: #2a5a2a; color: #a5f3a5; }
 .item-tag.util    { border-color: #2a5a2a; color: #a5f3a5; }
+.item-tag.exceptional { border-color: #2a5a2a; color: #a5f3a5; }
 .item-tag.flask   { border-color: #4a3a10; color: #e8c860; }
 .item-tag.weapon  { border-color: #3a2a10; color: #c8a870; }
 .item-tag.armour  { border-color: #2a3a4a; color: #70e8c8; }

@@ -88,8 +88,50 @@ function ask(question) {
       }
     }
   }
-  const distCmd = process.platform === 'linux' ? 'npm run dist:linux' : 'npm run dist:win'
-  execSync(distCmd, { stdio: 'inherit', cwd: CLIENT_ROOT })
+  const winOnly = process.argv.includes('--win-only')
+  const linuxOnly = process.argv.includes('--linux-only')
+  const doWin = !linuxOnly
+  const doLinux = !winOnly
+
+  // AppImage packing needs symlinks; Windows blocks that without dev-mode
+  // privilege, so the linux build runs inside WSL. It's built in a separate
+  // WSL-native checkout (~/poe-linux-build) with its own node_modules, so
+  // linux-ABI native deps never clobber the Windows-side install.
+  function wslPath(winP) {
+    const drive = winP[0].toLowerCase()
+    return '/mnt/' + drive + winP.slice(2).replace(/\\/g, '/')
+  }
+  // Nesting quotes through cmd.exe -> wsl -> bash -lc is unreliable, so the
+  // WSL side of the build runs from a script file instead of an inline -lc string.
+  function wslRun(scriptLines) {
+    const scriptWin = path.join(CLIENT_ROOT, '.wsl-build-step.sh')
+    fs.writeFileSync(scriptWin, '#!/usr/bin/env bash\nset -e\n' + scriptLines.join('\n') + '\n')
+    try {
+      execSync(`wsl -e bash ${wslPath(scriptWin)}`, { stdio: 'inherit' })
+    } finally {
+      fs.rmSync(scriptWin, { force: true })
+    }
+  }
+
+  if (doWin) execSync('npm run dist:win', { stdio: 'inherit', cwd: CLIENT_ROOT })
+  if (doLinux) {
+    if (process.platform === 'win32') {
+      const wslSrc = wslPath(CLIENT_ROOT)
+      wslRun([
+        'export NVM_DIR="$HOME/.nvm"',
+        '[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"',
+        'mkdir -p "$HOME/poe-linux-build"',
+        `rsync -a --delete --exclude node_modules --exclude dist --exclude out '${wslSrc}/' "$HOME/poe-linux-build/"`,
+        'cd "$HOME/poe-linux-build"',
+        'npm install',
+        'npm run dist:linux',
+        `mkdir -p '${wslSrc}/dist'`,
+        `cp "$HOME"/poe-linux-build/dist/*.AppImage "$HOME"/poe-linux-build/dist/*.deb '${wslSrc}/dist/' 2>/dev/null || true`,
+      ])
+    } else {
+      execSync('npm run dist:linux', { stdio: 'inherit', cwd: CLIENT_ROOT })
+    }
+  }
 
   // 8 ── output artifact paths
   const distFiles = fs.existsSync(distDir)

@@ -107,6 +107,28 @@ npm run test:coverage   # v8 coverage report in coverage/
 
 Tests live in `src/__tests__/` and cover the main-process services (filterWriter, clientTxtWatcher, gameInput, settings, data, validation). Electron and electron-store are mocked in `src/__tests__/setup.ts`.
 
+### Scripts
+
+`scripts/sync-data.js` — copies the game-data JSON files (`Items.json`, `BaseItems.json`, `Bosses.json`, `AlternateGems.json`, `AreaLocations.json`, `LevelLocations.json`) from `worlds/poe/data/` into `app/resources/data/`, then regenerates the options JSON via `python src/data/generate_options.py`. Run this any time `worlds/poe/data/*.json` changes and the bundled copy has gone stale:
+
+```bash
+node scripts/sync-data.js
+# or
+npm run sync-data
+```
+
+`src/data/generate_options.py` — the options-sync step invoked by `sync-data.js` (step 2). Reads `worlds/poe/data/Items.json` and `BaseItems.json` and writes the derived options/class-tree JSON to three locations: `worlds/poe/poeClient/pathofexile_ap/options_data.json`, `app/src/data/poe_options.json`, and `pathofexile_ap/options_data.json`. Run standalone if only the options need refreshing (no data-file copy needed):
+
+```bash
+python src/data/generate_options.py
+```
+
+`scripts/release.js` — interactive release flow: runs `sync-data.js` first, then bumps the version across `package.json`, `poe-version.json`, `worlds/poe/Version.py`, and `worlds/poe/archipelago.json`, builds `poe.apworld`, and packages the electron client. Prompts for the new version (`x.y.z`) and whether it's backwards-compatible with old clients:
+
+```bash
+node scripts/release.js
+```
+
 ---
 
 ## Configuration

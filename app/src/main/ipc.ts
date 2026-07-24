@@ -112,11 +112,11 @@ export function initIpc(): void {
   // Auto-connect to AP server if credentials are stored and GGG token is valid
   if (getValidToken() && s.serverAddress && s.slotName) {
     logger.info('[init] auto-connecting to AP server:', s.serverAddress, s.slotName)
-    patch({ connection: 'connecting' })
+    patch({ connection: 'connecting', connectionError: null })
     apSocket.connect(s.serverAddress, s.slotName, s.password ?? '', state.deathlink)
       .catch(e => {
         logger.warn('[init] auto-connect failed:', e?.message)
-        patch({ connection: 'error' })
+        patch({ connection: 'error', connectionError: e?.message ?? 'Connection failed' })
         pushChat({ t: timestamp(), kind: 'sys', body: `Auto-connect failed: ${e?.message}` })
       })
   }
@@ -143,7 +143,7 @@ export function initIpc(): void {
         complete: state.goal?.complete ?? false,
       }
       const totalGearUnlocks: number = gameOpts.total_gear_upgrades ?? 0
-      patch({ connection: 'connected', slotName: ev.slot, goal: goalState, totalGearUnlocks, playerGames: ev.playerGames })
+      patch({ connection: 'connected', connectionError: null, slotName: ev.slot, goal: goalState, totalGearUnlocks, playerGames: ev.playerGames })
 
       // Defer one tick so archipelago.js finishes populating room.checkedLocations/missingLocations
       setTimeout(() => {
@@ -366,5 +366,28 @@ export function initIpc(): void {
       return null
     }
     return handleAction(action)
+  })
+
+  // poewiki.net sits behind an Anubis bot-gate that JS-challenges any
+  // browser-like User-Agent (blocking renderer fetch with a CORS error).
+  // A plain non-browser UA sails straight through, so proxy from main.
+  //
+  // Use Cargo (poewiki's semantic-data query API) to pull the pre-rendered
+  // "items.html" field — the same tooltip HTML the wiki itself displays —
+  // instead of hand-parsing the {{Item}} wikitext template. The raw template
+  // params only carry a fraction of what's shown (stat text, requirements,
+  // quality bonus etc. are computed by the wiki's own template/module logic
+  // and only surface in the rendered output).
+  ipcMain.handle('wiki:fetchGems', async (_evt, names: string[]) => {
+    const quoted = names.map(n => `"${n.replace(/["\\]/g, '\\$&')}"`).join(',')
+    const params = new URLSearchParams({
+      action: 'cargoquery', tables: 'items', fields: 'items.name,items.html',
+      where: `items.name IN (${quoted})`, format: 'json', limit: String(names.length),
+    })
+    const r = await fetch(`https://www.poewiki.net/api.php?${params}`, {
+      headers: { 'User-Agent': `PoE-AP-Client/${CLIENT_VERSION}` },
+    })
+    if (!r.ok) throw new Error(`HTTP ${r.status}`)
+    return r.json()
   })
 }

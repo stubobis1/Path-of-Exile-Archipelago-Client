@@ -46,14 +46,14 @@ export async function handleAction(action: IpcAction): Promise<unknown> {
   switch (action.type) {
 
     case 'connect': {
-      patch({ connection: 'connecting', serverAddr: action.addr, slotName: action.slot })
+      patch({ connection: 'connecting', connectionError: null, serverAddr: action.addr, slotName: action.slot })
       settingsService.setMany({ serverAddress: action.addr, slotName: action.slot, password: action.password })
       settingsService.setMany({ serverAddress: action.addr, slotName: action.slot, password: action.password }, ...settingsCtx())
       try {
         await apSocket.connect(action.addr, action.slot, action.password, state.deathlink)
       } catch (e: any) {
         logger.error('Connect failed:', e?.message)
-        patch({ connection: 'error' })
+        patch({ connection: 'error', connectionError: e?.message ?? 'Connection failed' })
         pushChat({ t: timestamp(), kind: 'sys', body: `Connect failed: ${e?.message}` })
       }
       return null
@@ -61,6 +61,7 @@ export async function handleAction(action: IpcAction): Promise<unknown> {
 
     case 'disconnect': {
       await apSocket.disconnect()
+      patch({ connectionError: null })
       return null
     }
 

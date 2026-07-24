@@ -5,6 +5,7 @@ import poeVersion from '../../poe-version.json'
 contextBridge.exposeInMainWorld('electronAPI', {
   poeVersion: { clientVersion: poeVersion.clientVersion, backwardsCompatibleVersions: poeVersion.backwardsCompatibleVersions },
   action: (a: IpcAction) => ipcRenderer.invoke('action', a),
+  wikiFetchGems: (names: string[]) => ipcRenderer.invoke('wiki:fetchGems', names),
 
   onStateFull:  (fn: (s: AppState) => void) => {
     ipcRenderer.on('state:full', (_e, s) => fn(s))

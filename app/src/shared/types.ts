@@ -182,6 +182,7 @@ export interface APLocation {
 // IPC state snapshot pushed from main → renderer
 export interface AppState {
   connection:  ConnectionStatus
+  connectionError: string | null
   serverAddr:  string
   slotName:    string
   oauthStatus: OAuthStatus
@@ -217,6 +218,7 @@ declare global {
     electronAPI: {
       poeVersion: { clientVersion: string; backwardsCompatibleVersions: string[] }
       action: (a: IpcAction) => Promise<unknown>
+      wikiFetchGems: (names: string[]) => Promise<unknown>
       onStateFull:  (fn: (s: AppState) => void) => void
       onStatePatch: (fn: (delta: Partial<AppState>) => void) => void
       onHotkeyRevalidate: (fn: () => void) => void

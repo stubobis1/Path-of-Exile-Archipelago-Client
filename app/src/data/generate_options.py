@@ -154,6 +154,19 @@ def main():
 
     item_names = sorted({item['name'] for item in items_raw})
 
+    # ── Class → ascendancy tree (derived from Items.json category tags) ────────
+    base_class_order = ['Marauder', 'Duelist', 'Ranger', 'Shadow', 'Witch', 'Templar', 'Scion']
+    ascendancies_by_base: dict = {base: [] for base in base_class_order}
+    for item in items_raw:
+        cats = item.get('category', [])
+        if 'Ascendancy' not in cats:
+            continue
+        class_cat = next((c for c in cats if c.endswith(' Class') and c not in ('Base Class', 'Character Class')), None)
+        if class_cat:
+            base = class_cat[:-len(' Class')]
+            ascendancies_by_base.setdefault(base, []).append(item['name'])
+    class_tree = [{'base': base, 'ascendancies': ascendancies_by_base.get(base, [])} for base in base_class_order]
+
     # Build locs_map from data files (ordered by AP ID / source-file order).
     locs_map: dict = {}
     for item in base_items_raw:
@@ -187,6 +200,8 @@ def main():
                 opt['valid_keys'] = location_names
             elif opt['name'] == 'bosses_available':
                 opt['boss_groups'] = boss_groups
+
+    data['class_tree'] = class_tree
 
     data['version_info'] = {
         'world_version':       manifest['world_version'],

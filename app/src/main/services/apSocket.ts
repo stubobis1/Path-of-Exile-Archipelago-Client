@@ -29,6 +29,7 @@ function createAPSocket() {
   // newer, unrelated client (see plan-2.2.0.md item #2).
   let _connectToken = 0
   let _connecting: Promise<void> | null = null
+  let _lastRefusalErrors: any[] | null = null
 
   const emit = (ev: APEvent) => listeners.forEach(l => l(ev))
 
@@ -143,6 +144,7 @@ function createAPSocket() {
 
         myClient.socket.on('connectionRefused', (pkt: any) => {
           logger.error('[AP] connection refused:', JSON.stringify(pkt?.errors))
+          _lastRefusalErrors = pkt?.errors ?? null
         })
 
         myClient.room.on('locationsChecked', (ids: number[]) => {
@@ -193,12 +195,21 @@ function createAPSocket() {
         } catch { /* hints API unavailable */ }
 
         logger.info(`[AP] calling login(${addr}, ${slotName}, ${game})`)
-        await myClient.login(addr, slotName, game, {
-          password: password ?? '',
-          items:    itemsHandlingFlags.all,
-          // Always register DeathLink so we receive bounces; ipc layer gates behaviour on settings.
-          tags:     ['AP', 'DeathLink'],
-        })
+        _lastRefusalErrors = null
+        try {
+          await myClient.login(addr, slotName, game, {
+            password: password ?? '',
+            items:    itemsHandlingFlags.all,
+            // Always register DeathLink so we receive bounces; ipc layer gates behaviour on settings.
+            tags:     ['AP', 'DeathLink'],
+          })
+        } catch (e: any) {
+          // Prefer the server's stated refusal reasons (e.g. InvalidPassword,
+          // InvalidSlot, IncompatibleVersion) over archipelago.js's generic
+          // rejection message, since connectionRefused fires just before login() rejects.
+          if (_lastRefusalErrors) throw new Error(_lastRefusalErrors.join(', '))
+          throw e
+        }
         logger.info('[AP] login() resolved successfully')
       })()
 

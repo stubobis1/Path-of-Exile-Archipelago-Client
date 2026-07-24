@@ -1,31 +1,28 @@
 import React, { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { imgOnError } from '../imgError'
 import { ValidationErrors } from '../components/ValidationErrors'
 import { useStore } from '../store'
 import type { ReceivedItem, APItem, APHint, APLocation } from '@shared/types'
-import { initGemTooltips, preloadGems, showGemTooltip, hideGemTooltip, moveGemTooltip, getGemTags } from '../services/gemTooltip'
+import { initGemTooltips, preloadGems, showGemTooltip, hideGemTooltip, moveGemTooltip, getGemTags, clearGemCache } from '../services/gemTooltip'
 import { PaperDoll } from '../components/PaperDoll'
 import { HintedItems } from '../components/HintedItems'
+import poeOptionsJson from '../../data/poe_options.json'
 
-const CLASS_TREE = [
-  { base: 'Marauder', asc: ['Berserker', 'Chieftain', 'Juggernaut'] },
-  { base: 'Duelist',  asc: ['Champion', 'Gladiator', 'Slayer'] },
-  { base: 'Scion',    asc: ['Ascendant', 'Reliquarian'] },
-  { base: 'Ranger',   asc: ['Deadeye', 'Pathfinder', 'Warden'] },
-  { base: 'Shadow',   asc: ['Assassin', 'Saboteur', 'Trickster'] },
-  { base: 'Witch',    asc: ['Elementalist', 'Necromancer', 'Occultist'] },
-  { base: 'Templar',  asc: ['Guardian', 'Hierophant', 'Inquisitor'] },
-]
+const CLASS_TREE: { base: string; asc: string[] }[] =
+  (poeOptionsJson as { class_tree: { base: string; ascendancies: string[] }[] }).class_tree
+    .map(({ base, ascendancies }) => ({ base, asc: ascendancies }))
 
-const CAT_ORDER = ['Skill Gems', 'Support Gems', 'Utility Gems', 'Flasks', 'Weapons', 'Armour', 'Progression', 'Other']
+const CAT_ORDER = ['Skill Gems', 'Support Gems', 'Utility Gems', 'Exceptional Gems', 'Flasks', 'Weapons', 'Armour', 'Progression', 'Other']
 const CAT_CSS: Record<string, string> = {
-  'Skill Gems':   'gem',
-  'Support Gems': 'support',
-  'Utility Gems': 'util',
-  'Flasks':       'flask',
-  'Weapons':      'weapon',
-  'Armour':       'armour',
-  'Progression':  'prog',
+  'Skill Gems':      'gem',
+  'Support Gems':    'support',
+  'Utility Gems':    'util',
+  'Exceptional Gems':'exceptional',
+  'Flasks':          'flask',
+  'Weapons':         'weapon',
+  'Armour':          'armour',
+  'Progression':     'prog',
 }
 
 function imgUrl(name: string) {
@@ -41,6 +38,7 @@ function categorizeItem(item: APItem): string {
   if (cats.includes('Base Class')) return 'Classes'
   if (cats.includes('Ascendancy')) return 'Ascendancies'
   if (cats[0] === 'GemModifier') return 'GemModifiers'
+  if (cats.includes('Exceptional')) return 'Exceptional Gems'
   if (cats[0] === 'MainSkillGem') return 'Skill Gems'
   if (cats[0] === 'SupportGem') return 'Support Gems'
   if (cats[0] === 'UtilSkillGem') return 'Utility Gems'
@@ -95,7 +93,7 @@ function ItemTag({ name, count, css, isGem, levelReq, dimmed }: { name: string; 
   )
 }
 
-const GEM_CATS = new Set(['Skill Gems', 'Support Gems', 'Utility Gems'])
+const GEM_CATS = new Set(['Skill Gems', 'Utility Gems', 'Support Gems', 'Exceptional Gems'])
 
 type GemSort = 'alpha' | 'level'
 
@@ -191,11 +189,54 @@ function HintsSection({ hints, locations, slotName, connected }: { hints: APHint
   )
 }
 
+function GemCacheMenu({ x, y, onClose, gemNames }: { x: number; y: number; onClose: () => void; gemNames: string[] }) {
+  useEffect(() => {
+    // Skip the click/keydown that's still bubbling from the right-click that opened this menu.
+    const id = requestAnimationFrame(() => {
+      window.addEventListener('click', onClose)
+      window.addEventListener('keydown', onKey)
+    })
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
+    return () => {
+      cancelAnimationFrame(id)
+      window.removeEventListener('click', onClose)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [onClose])
+
+  return createPortal(
+    <div
+      className="mono"
+      style={{
+        position: 'fixed', left: x, top: y, zIndex: 100000,
+        background: 'var(--bg-3)', border: '1px solid var(--rule)', borderRadius: 6,
+        boxShadow: '0 6px 28px rgba(0,0,0,.6)', padding: 4, minWidth: 180, fontSize: 12,
+      }}
+      onContextMenu={e => e.preventDefault()}
+    >
+      <div
+        style={{ padding: '6px 10px', borderRadius: 4, cursor: 'pointer' }}
+        onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-4, #333)')}
+        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+        onClick={() => {
+          clearGemCache()
+          if (gemNames.length) preloadGems(gemNames)
+          onClose()
+        }}
+      >
+        Clear gem tooltip cache
+      </div>
+    </div>,
+    document.body
+  )
+}
+
 export function ItemsScreen() {
   const { items, hints, char, locations, slotName, connection } = useStore()
   const [search, setSearch] = useState('')
   const [gemSort, setGemSort] = useState<GemSort>('alpha')
   const [catalog, setCatalog] = useState<APItem[]>([])
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null)
 
   useEffect(() => {
     const xhr = new XMLHttpRequest()
@@ -230,13 +271,14 @@ export function ItemsScreen() {
 
   useEffect(() => { initGemTooltips() }, [])
 
+  const gemNames = React.useMemo(() => items
+    .filter(i => GEM_CATS.has(categorizeItem(i)))
+    .map(i => i.name)
+    .filter((n, idx, arr) => arr.indexOf(n) === idx), [items])
+
   useEffect(() => {
-    const gemNames = items
-      .filter(i => GEM_CATS.has(categorizeItem(i)))
-      .map(i => i.name)
-      .filter((n, idx, arr) => arr.indexOf(n) === idx)
     if (gemNames.length) preloadGems(gemNames)
-  }, [items])
+  }, [gemNames])
 
   const passiveItems = items.filter(i => i.name === 'Progressive passive point' || i.name.toLowerCase().includes('passive point'))
   const passiveCount = passiveItems.length
@@ -288,7 +330,8 @@ export function ItemsScreen() {
   }
 
   return (
-    <div style={{ flex: 1, overflow: 'auto' }}>
+    <div style={{ flex: 1, overflow: 'auto' }} onContextMenu={e => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY }) }}>
+      {ctxMenu && <GemCacheMenu x={ctxMenu.x} y={ctxMenu.y} onClose={() => setCtxMenu(null)} gemNames={gemNames} />}
       <div className="page-header">
         <h1>Items</h1>
         <div className="sub">{items.length} received</div>
@@ -361,7 +404,7 @@ export function ItemsScreen() {
               {(entries.length > 0 || unreceived.length > 0) && (
                 <CatSection cat={cat} entries={entries} gemSort={gemSort} gemLevelReq={gemLevelReq} unreceivedEntries={unreceived.length > 0 ? unreceived : undefined} />
               )}
-              {cat === 'Utility Gems' && items.length > 0 && <GemModifiersSection receivedNames={allReceivedNames} />}
+              {cat === 'Exceptional Gems' && items.length > 0 && <GemModifiersSection receivedNames={allReceivedNames} />}
             </React.Fragment>
           )
         })}
