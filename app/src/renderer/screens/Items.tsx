@@ -26,6 +26,9 @@ const CAT_CSS: Record<string, string> = {
 }
 
 function imgUrl(name: string) {
+  if (name.startsWith('defeat ')) {
+    return `ap-assets:///images/boss/${name.slice('defeat '.length)}.png`
+  }
   return `ap-assets:///images/${name.toLowerCase().replace(/['\s]/g, '')}.png`
 }
 

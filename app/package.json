@@ -1,6 +1,6 @@
 {
   "name": "poe-archipelago-client",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "description": "Path of Exile Archipelago Client",
   "main": "out/main/index.js",
   "author": "StuBob",

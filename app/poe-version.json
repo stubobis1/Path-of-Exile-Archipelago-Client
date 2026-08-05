@@ -1,6 +1,7 @@
 {
-  "clientVersion": "2.2.0",
+  "clientVersion": "2.2.1",
   "backwardsCompatibleVersions": [
-    "2.2.0"
+    "2.2.0",
+    "2.2.1"
   ]
 }
