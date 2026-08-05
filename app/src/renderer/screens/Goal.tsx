@@ -2,6 +2,12 @@ import React from 'react'
 import { useStore } from '../store'
 import { ValidationErrors } from '../components/ValidationErrors'
 
+const bossImageModules = import.meta.glob('../../../resources/images/boss/*.png', { eager: true, import: 'default' }) as Record<string, string>
+
+const BOSS_IMAGES: Record<string, string> = Object.fromEntries(
+  Object.entries(bossImageModules).map(([path, url]) => [path.replace(/^.*\/([^/]+)\.png$/, '$1'), url])
+)
+
 const GOAL_NAMES: Record<number, string> = {
   0:  'Complete the Campaign',
   1:  'Complete Act 1',
@@ -61,7 +67,8 @@ export function GoalScreen() {
             {goal.bosses && goal.bosses.length > 0 ? (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10, maxWidth: 800 }}>
                 {goal.bosses.map(boss => {
-                  const done = goal.defeated.includes(boss)
+                  const done    = goal.defeated.includes(boss)
+                  const imgSrc  = BOSS_IMAGES[boss]
                   return (
                     <div key={boss} className="card" style={{
                       padding: '12px 16px',
@@ -69,6 +76,13 @@ export function GoalScreen() {
                       borderColor: done ? 'color-mix(in oklch, var(--ok) 50%, var(--rule))' : undefined,
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        {imgSrc && (
+                          <img
+                            src={imgSrc}
+                            alt={boss}
+                            style={{ width: 28, height: 28, objectFit: 'cover', borderRadius: 4, flexShrink: 0 }}
+                          />
+                        )}
                         {done
                           ? <span style={{ color: 'var(--ok)', fontSize: 14 }}>✓</span>
                           : <span style={{ color: 'var(--ink-4)', fontSize: 14 }}>✗</span>
